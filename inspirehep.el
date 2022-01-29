@@ -4,6 +4,7 @@
 ;; Modified: January 18, 2022
 ;; Version: 0.0.1
 ;; Keywords: bib
+;; Url: https://github.com/aikrahguzar/inspirehep.el
 ;; Package-Requires: ((emacs "27.1"))
 ;;
 ;; This file is not part of GNU Emacs.
