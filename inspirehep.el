@@ -230,7 +230,7 @@ request returns another error, an exception is raised."
     (when target (goto-char target)
           (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
                    ((not (pos-visible-in-window-p entry-end))))
-              (set-window-start (selected-window) target)))))
+              (set-window-start (selected-window) (- target 2))))))
 
 (defun inspirehep--selection-first ()
   "Move to first search result."
