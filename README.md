@@ -48,6 +48,7 @@ By default this package will fetch the pages in background and insert the result
 The syntax for search queries is explained at [https://help.inspirehep.net/knowledge-base/inspire-paper-search](https://help.inspirehep.net/knowledge-base/inspire-paper-search).
 
 ## Acknowledgments
+
 This package started as an attempt to add INSPIRE as a backend to [biblio.el](https://github.com/cpitclaudel/biblio.el) which is still a much better option for
 general reference search. But I wanted to make enough minor changes to the internals of it that I eventually extracted the parts I needed but they still make
 majority of the code in this package.

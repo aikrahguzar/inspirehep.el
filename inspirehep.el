@@ -220,15 +220,17 @@ request returns another error, an exception is raised."
        (seq-find (lambda (ov) (overlay-get ov 'details)) (overlays-at (1- (cdr (get-text-property (point) 'inspirehep-entry-bounds))))))
 
 ;;;; Interaction
-(defun inspirehep--selection-move (move-fn search-fn &optional recenter-p arg)
+(defun inspirehep--selection-move (move-fn search-fn)
   "Move using MOVE-FN, then call SEARCH-FN and go to first match."
   (let ((target nil))
     (save-excursion
       (funcall move-fn)
       (when (funcall search-fn (concat "^" inspirehep-search-result-marker) nil t)
         (setq target (match-end 0))))
-    (when target (goto-char target)))
-  (when recenter-p (recenter arg)))
+    (when target (goto-char target)
+          (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
+                   ((not (pos-visible-in-window-p entry-end))))
+              (set-window-start (selected-window) target)))))
 
 (defun inspirehep--selection-first ()
   "Move to first search result."
@@ -582,12 +584,12 @@ The file is stored in the directory specified by `inspirehep-download-directory'
 (defun inspirehep--selection-next ()
   "Move to next search result."
   (interactive)
-  (inspirehep--selection-move #'end-of-line #'re-search-forward t 2))
+  (inspirehep--selection-move #'end-of-line #'re-search-forward))
 
 (defun inspirehep--selection-previous ()
   "Move to previous search result."
   (interactive)
-  (inspirehep--selection-move #'beginning-of-line #'re-search-backward t 2))
+  (inspirehep--selection-move #'beginning-of-line #'re-search-backward))
 
 ;;;;;; Hiding and showing details
 (defun inspirehep-toggle-details (ov) "Toggle the visibility of details for current entry" (interactive (list (inspirehep-details-overlay)))
