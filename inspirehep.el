@@ -607,7 +607,8 @@ The file is stored in the directory specified by `inspirehep-download-directory'
 (defun inspirehep-select-target-buffer (buffer-name)
   "Change buffer in which BibTeX results will be inserted.
 BUFFER-NAME is the name of the new target buffer."
-  (interactive (list (read-buffer "Buffer to insert entries into: ")))
+  (interactive (list (read-buffer "Buffer to insert entries into: " nil t
+                                  (lambda (b) (buffer-file-name (get-buffer (if (stringp b) b (car b))))))))
   (let ((buffer (get-buffer buffer-name)))
     (if (buffer-local-value 'buffer-read-only buffer)
         (user-error "%s is read-only" (buffer-name buffer))
