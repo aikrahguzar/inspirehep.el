@@ -86,7 +86,7 @@ are fectched one after another and inserted into the buffer as they arrive."
 
 (defvar inspirehep--search-history nil)
 
-(defvar inspirehep-search-parameters "&size=25&sort=mostrecent&fields=titles.title,authors.full_name,authors.ids,abstracts,arxiv_eprints,documents.url,texkeys"
+(defvar inspirehep-search-parameters "&size=25&sort=mostrecent&fields=titles.title,authors.full_name,authors.ids,abstracts,arxiv_eprints,documents.url,texkeys,preprint_date,imprints.date"
   "Determines the number of results, sort order and fields retrieved.")
 
 (defvar inspirehep--time-stamps nil "Variable for rate limiting requests.")
@@ -456,10 +456,12 @@ Results are parsed with (BACKEND 'parse-buffer)."
               (id-end (nth 1 (split-string id ":" t " ")))
               (arxiv-id (map-nested-elt metadata '("arxiv_eprints" 0 "value")))
               (title (map-nested-elt metadata '("titles" 0 "title")))
+              (date (or (map-elt metadata "preprint_date") (map-nested-elt metadata '("imprints" 0 "date"))))
               (auths (seq-map (lambda (x) (split-string (gethash "full_name" x) "," t " ")) (gethash "authors" metadata)))
               (auths-last (if (> (length auths) 4) (concat (caar auths) " et al") (string-join (seq-map #'car auths) ", "))))
          (list (cons 'identifier id)
                (cons 'title title)
+               (cons 'year (when date (truncate-string-to-width date 4)))
                (cons 'authors (seq-map #'inspirehep--author-with-id (gethash "authors" metadata)))
                (cons 'tex-keys (map-elt metadata "texkeys"))
                (cons 'arXiv (seq-map (lambda (e) (concat (map-nested-elt e '("categories" 0)) ":" (gethash "value" e))) (gethash "arxiv_eprints" metadata)))
