@@ -264,9 +264,9 @@ NEWLINE is non-nil, add a newline before the main text."
     (when newline (insert "\n"))
     (inspirehep-insert-with-prefix prefix items)))
 
-(defun inspirehep--prepare-authors (authors)
-  "Cleanup and join list of AUTHORS."
-  (let* ((authors (seq-map #'string-trim authors))
+(defun inspirehep--prepare-authors (auths)
+  "Cleanup and join list of authors AUTHS."
+  (let* ((authors (seq-map #'string-trim auths))
          (num-authors (length authors)))
     ;; Only truncate when significantly above limit
     (when (> num-authors (+ 2 inspirehep-authors-limit))
@@ -544,7 +544,7 @@ inserted."
        (let* ((author-at-point (get-text-property (point) 'inspirehep-author-id))
               (auth (if author-at-point author-at-point
                       (let* ((candidates  (inspirehep-lookup-at-point 'authors))
-                             (candidate (completing-read "Select an Author: " candidates  nil t)))
+                             (candidate (if (cdr candidates) (completing-read "Select an Author: " candidates  nil t) (car candidates))))
                         (get-text-property 0 'inspirehep-author-id (car (member candidate candidates)))))))
          (inspirehep--lookup-url (inspirehep-query-url (concat "a " auth))
                                  (cons (car inspirehep--search-terms) (concat "Articles by " "“" auth "”"))
