@@ -1,7 +1,7 @@
-# inspirehep.el: An Emacs package for High Enegry Physics literature search using INSPIRE API
+# inspirehep.el: An Emacs package for High Enegry Physics literature search
 [![GPL 3](https://img.shields.io/badge/license-GPLv3-blue.svg)](COPYING)
 
-*inspirehep.el* provides an Emacs interface to the literature search for high energy physics using [INSPIRE](https://inspirehep.net/) using the JSON api.
+*inspirehep.el* provides an Emacs interface to the literature search for high energy physics using the JSON api provided by [INSPIRE](https://inspirehep.net/).
 
 ## Usage
 
