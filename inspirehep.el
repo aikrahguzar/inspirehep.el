@@ -23,7 +23,6 @@
 (require 'hl-line)
 (require 'json)
 (require 'url-queue)
-(require 'reftex)
 (require 'let-alist)
 (require 'seq)
 
@@ -452,7 +451,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
 
 (defun inspirehep-parse-entry (entry) "Parse an entry retrieved from an inspirehep query in the inspirehep.el format"
        (let* ((metadata (gethash "metadata" entry))
-              (id (map-nested-elt metadata '("texkeys" 0)))
+              (id (or (map-nested-elt metadata '("texkeys" 0)) (map-elt entry "id")))
               (id-end (nth 1 (split-string id ":" t " ")))
               (arxiv-id (map-nested-elt metadata '("arxiv_eprints" 0 "value")))
               (title (map-nested-elt metadata '("titles" 0 "title")))
