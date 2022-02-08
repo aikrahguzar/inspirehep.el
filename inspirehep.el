@@ -1,4 +1,4 @@
-;;; inspirehep.el --- Inspirehep backend for inspirehep -*- lexical-binding: t; -*-
+;;; inspirehep.el --- Emacs frontend for INSPIRE HEP -*- lexical-binding: t; -*-
 ;;
 ;; Created: January 18, 2022
 ;; Modified: January 18, 2022
@@ -379,19 +379,15 @@ provide examples of how to build such a result."
 (defun inspirehep-insert-results (items keys) "Insert results into the current buffer"
     (seq-do (lambda (item) (inspirehep-insert-result item (not (null (seq-intersection (map-elt item 'tex-keys) keys))))) items))
 
-(defun inspirehep-insert-results-new-query (items keys)
+(defun inspirehep-insert-results-new-query (num items keys)
   "Populate current buffer with ITEMS then display it."
     (erase-buffer)
-    (inspirehep--insert-header (inspirehep--search-results-header))
+    (inspirehep--insert-header (concat (inspirehep--search-results-header) " (" (number-to-string num) " total results)"))
     (inspirehep-insert-results items keys)
     (inspirehep--selection-first)
     (set-buffer-modified-p nil)
   (pop-to-buffer (current-buffer))
   (hl-line-highlight))
-
-;; (defun inspirehep--display-results (&rest _)
-;;   "Disaply results of a search."
-;;   (inspirehep-insert-results (inspirehep-make-entries)))
 
 (defun inspirehep--callback (results-buffer &optional insert-p insert-all-p)
   "Generate a search results callback for RESULTS-BUFFER.
@@ -405,8 +401,8 @@ Results are parsed with (BACKEND 'parse-buffer)."
        (with-current-buffer results-buffer
          (setq inspirehep--link-next (nth 1 parsed-data))
          (if insert-p (save-excursion (goto-char (point-max))
-                                      (inspirehep-insert-results (nth 2 parsed-data) (inspirehep-target-buffer-keys)))
-           (inspirehep-insert-results-new-query (nth 2 parsed-data) (inspirehep-target-buffer-keys))
+                                      (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
+           (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys))
            (inspirehep--selection-first))
          (when insert-all-p (inspirehep-next-page t t)))))))
 
@@ -441,7 +437,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
 
 ;;;; Dealing with JSON from inspirehep
 (defun inspirehep-query-url (query) "Prepare url for an inspirehep search"
-       (concat "https://inspirehep.net/api/literature?q=" (url-encode-url query) inspirehep-search-parameters))
+       (concat "https://inspirehep.net/api/literature?q=" (url-hexify-string query) inspirehep-search-parameters))
 
 (defun inspirehep--author-with-id (auth) "Put AUTH with id as a text property on name"
        (let ((name (gethash "full_name" auth))
@@ -475,7 +471,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
        (seq-map #'car (when inspirehep--target-buffer (with-current-buffer inspirehep--target-buffer (bibtex-parse-keys)))))
 
 (defun inspirehep-make-entries (json) "Parse a json response from inspirehep"
-        (list (map-nested-elt json '("links" "bibtex")) (map-nested-elt json '("links" "next"))
+        (list (map-nested-elt json '("links" "bibtex")) (map-nested-elt json '("links" "next")) (map-nested-elt json '("hits" "total"))
              (seq-map #'inspirehep-parse-entry (map-nested-elt json '("hits" "hits")))))
 
 (defun inspirehep-parse-search-results () "Extract structured data from inspirehep response."
@@ -484,7 +480,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
 ;;;; Dealing with BibTeX from inspirehep
 (defun inspirehep-parse-bibtex () "Parse bibtex entries retrieved from inspirehep"
        (seq-map (lambda (entry) (let ((beg (1+ (string-match "{" entry))) (end (string-match "," entry)))
-                             (cons (substring-no-properties entry beg end) (concat "\n@" entry)))) (split-string (buffer-string) "\n@" t)))
+                             (cons (substring-no-properties entry beg end) (concat "\n@" entry)))) (split-string (buffer-string) "@" t "\n")))
 
 (defun inspirehep-bibtex-callback (buffer)
   (lambda () (let ((bibtex (inspirehep-parse-bibtex))) (with-current-buffer buffer (cl-callf2 map-merge 'hash-table inspirehep-bibtex-entries bibtex)))))
@@ -565,7 +561,7 @@ The file is stored in the directory specified by `inspirehep-download-directory'
 
 (defun inspirehep-insert-and-download () "Insert the bibtex entry and download the pdf from METADATA"
        (interactive)
-       (call-interactively #'inspirehep-download-pdf) (call-interactively #'inspirehep-insert-bibtex))
+       (with-demoted-errors "Downlaod: %S" (call-interactively #'inspirehep-download-pdf)) (call-interactively #'inspirehep-insert-bibtex))
 
 ;;;;;; Moving around in buffer
 (defun inspirehep--selection-browse ()
