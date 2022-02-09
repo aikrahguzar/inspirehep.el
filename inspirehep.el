@@ -414,7 +414,7 @@ NEW-P indicates a new query."
                                       (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
            (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys))
            (inspirehep--selection-first))
-         (when (eq insert-p 'all) (inspirehep-next-page 'all)))))))
+         (when (eq insert-p 'all) (if inspirehep--link-next (inspirehep-next-page 'all) (message "Done inserting the search results."))))))))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
        (let* ((bounds (get-text-property (point) 'inspirehep-entry-bounds))
