@@ -28,9 +28,9 @@
 
 ;;;; Variables, groups and faces
 ;;;;;; Customize
-(defgroup inspirehep nil "inspirehep in emacs using inspirehep.el" :group 'communication)
+(defgroup inspirehep nil "INSPIRE HEP search in Emacs." :group 'communication)
 
-(defcustom inspirehep-download-directory nil "Directory to download pdf files in" :group 'inspirehep :type 'directory)
+(defcustom inspirehep-download-directory nil "Directory to download pdf files in." :group 'inspirehep :type 'directory)
 
 (defcustom inspirehep-authors-limit 10
   "Maximum number of authors to display per paper."
@@ -38,7 +38,7 @@
   :type 'integer)
 
 (defcustom inspirehep-target-buffer-function #'inspirehep-find-target
-  "Function used to determine the target buffer for searches"
+  "Function used to determine the target buffer for searches."
   :group 'inspirehep
   :type 'function)
 
@@ -46,8 +46,9 @@
   :group 'inspirehep
   :type 'string)
 
-(defcustom inspirehep-insert-all t "Determines whether all results are inserted in the buffer.
-If `nil' we fetch only the first page of results. If `non-nil' all the pages
+(defcustom inspirehep-insert-all t
+  "Determines whether all results are inserted in the buffer.
+If nil we fetch only the first page of results. If non-nil all the pages
 are fectched one after another and inserted into the buffer as they arrive."
   :group 'inspirehep
   :type 'boolean)
@@ -60,7 +61,7 @@ are fectched one after another and inserted into the buffer as they arrive."
 ;;;;;; defconst, defvar and defvar-local
 (defconst inspirehep--selection-mode-name-base "INSPIRE search results")
 
-(defvar inspirehep--download-queue nil "Store the files being downloaded")
+(defvar inspirehep--download-queue nil "Store the files being downloaded.")
 
 (defvar inspirehep-mode-map
   (let ((map (make-sparse-keymap)))
@@ -101,9 +102,9 @@ This variable is local to each search results buffer.")
   "Backend that produced a page of inspirehepgraphic search results.")
 
 (defvar-local inspirehep--link-next nil
-  "Links to the next page of search results")
+  "Links to the next page of search results.")
 
-(defvar-local inspirehep-bibtex-entries nil "Stores the bibtex entries obtained from inspirehep for the current query")
+(defvar-local inspirehep-bibtex-entries nil "Stores the bibtex entries obtained from inspirehep for the current query.")
 
 ;;;; Major mode
 (defun inspirehep--selection-mode-name ()
@@ -150,7 +151,7 @@ This variable is local to each search results buffer.")
            (signal 'inspirehep--url-error err)))))
 
 (defun inspirehep--plist-get-all (plist prop)
-  "Get all the values for PROP in PLIST"
+  "Get all the values for PROP in PLIST ."
   (let (res)
     (while plist
       (if (eq prop (pop plist))
@@ -166,8 +167,7 @@ This variable is local to each search results buffer.")
   "Make an `url'-ready callback from CALLBACK.
 CALLBACK is called with no arguments; the buffer containing the
 server's response is current at the time of the call, and killed
-after the call returns.  Call CLEANUP-FUNCTION before checking
-for errors.  If the request returns one of the errors in
+after the call returns. If the request returns one of the errors in
 ALLOWED-ERRORS, CALLBACK is instead called with one argument, the
 list of allowed errors that occurred instead of a buffer.  If the
 request returns another error, an exception is raised."
@@ -187,7 +187,7 @@ request returns another error, an exception is raised."
         (kill-buffer target-buffer)))))
 
 (defun inspirehep-find-target ()
-  "Find the target file using the major mode of current buffer"
+  "Find the target file using the major mode of current buffer."
   (pcase major-mode
     ('latex-mode (find-file-noselect (progn (reftex-access-scan-info t)
                                             (ignore-errors (car (reftex-get-bibfile-list))))))
@@ -215,7 +215,7 @@ request returns another error, an exception is raised."
        ,@body
        (overlay-put (make-overlay ,beg-var (point)) 'details t))))
 
-(defun inspirehep-details-overlay () "Return the details overlay of the entry at point"
+(defun inspirehep-details-overlay () "Return the details overlay of the entry at point."
        (seq-find (lambda (ov) (overlay-get ov 'details)) (overlays-at (1- (cdr (get-text-property (point) 'inspirehep-entry-bounds))))))
 
 ;;;; Interaction
@@ -314,13 +314,16 @@ With LOADING-P, mention that results are being loaded."
           (insert header "\n"))))))
 
 ;;;;;; Insert resut
-(defun inspirehep-insert-result-title (saved title year) "Insert the TITLE and YEAR for the entry"
-       (inspirehep-with-fontification (if saved 'match 'bold)
+(defun inspirehep-insert-result-title (saved-p title year)
+  "Insert the TITLE and YEAR for the entry.
+Non-nil SAVED-P means that the entry is present in the target buffer."
+       (inspirehep-with-fontification (if saved-p 'match 'bold)
           (inspirehep-insert-with-prefix inspirehep-search-result-marker (inspirehep--prepare-title title year))))
 
 (defun inspirehep-insert-result (item saved-p &optional no-sep)
-  "Print a (prepared) inspirehepgraphic search result ITEM.
-With NO-SEP, do not add space after the record.
+  "Print a (prepared) inspirehep search result ITEM.
+With NO-SEP, do not add space after the record. Non-nil SAVED-P means that
+the entry is present in the target buffer.
 
 This command expects ITEM to be a single alist, in the following format:
 
@@ -365,7 +368,7 @@ provide examples of how to build such a result."
 
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer (target-buffer search-terms &optional results-buffer)
-  "Set up the results buffer for TARGET-BUFFER, SEARCH-TERMS and BACKEND."
+  "Set up the RESULTS-BUFFER for TARGET-BUFFER, SEARCH-TERMS."
   (with-current-buffer (get-buffer-create (or results-buffer "* INSPIRE HEP *"))
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -376,11 +379,15 @@ provide examples of how to build such a result."
       (setq buffer-read-only t)
       (current-buffer))))
 
-(defun inspirehep-insert-results (items keys) "Insert results into the current buffer"
-    (seq-do (lambda (item) (inspirehep-insert-result item (not (null (seq-intersection (map-elt item 'tex-keys) keys))))) items))
+(defun inspirehep-insert-results (items keys)
+  "Insert result ITEMS into the current buffer.
+KEYS should be the list of keys present in the target buffer."
+  (seq-do (lambda (item) (inspirehep-insert-result item (not (null (seq-intersection (map-elt item 'tex-keys) keys))))) items))
 
 (defun inspirehep-insert-results-new-query (num items keys)
-  "Populate current buffer with ITEMS then display it."
+  "Populate current buffer with ITEMS then display it.
+KEYS should be the list of keys present in the target buffer
+and NUM the total number of results."
     (erase-buffer)
     (inspirehep--insert-header (concat (inspirehep--search-results-header) " (" (number-to-string num) " total results)"))
     (inspirehep-insert-results items keys)
@@ -389,9 +396,12 @@ provide examples of how to build such a result."
   (pop-to-buffer (current-buffer))
   (hl-line-highlight))
 
-(defun inspirehep--callback (results-buffer &optional insert-p insert-all-p)
+(defun inspirehep--callback (results-buffer &optional new-p insert-p)
   "Generate a search results callback for RESULTS-BUFFER.
-Results are parsed with (BACKEND 'parse-buffer)."
+If INSERT-P is non-nil the results are inserted at the end of RESULTS-BUFFER
+, otherwise they are inserted in a clean buffer. If INSERT-P is symbol all,
+all the pages of results are fetched and inserted one after another.
+NEW-P indicates a new query."
   (inspirehep-generic-url-callback
    (lambda () ;; no allowed errors, so no arguments
      "Parse results of inspirehepgraphic search."
@@ -400,11 +410,11 @@ Results are parsed with (BACKEND 'parse-buffer)."
        (inspirehep-retrieve-bibtex results-buffer (nth 0 parsed-data))
        (with-current-buffer results-buffer
          (setq inspirehep--link-next (nth 1 parsed-data))
-         (if insert-p (save-excursion (goto-char (point-max))
+         (if (not new-p) (save-excursion (goto-char (point-max))
                                       (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
            (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys))
            (inspirehep--selection-first))
-         (when insert-all-p (inspirehep-next-page t t)))))))
+         (when (eq insert-p 'all) (inspirehep-next-page 'all)))))))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
        (let* ((bounds (get-text-property (point) 'inspirehep-entry-bounds))
@@ -413,7 +423,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
          (put-text-property (car bounds) (cdr bounds) 'inspirehep-saved saved)
          (setcar (get-text-property (car bounds) 'face) (if saved 'match 'bold))))
 
-(defun inspirehep-revert-buffer (&rest _) "Revert buffer, by updating information about saved entries"
+(defun inspirehep-revert-buffer (&rest _) "Revert buffer, by updating information about saved entries."
        (inspirehep--selection-first)
        (let ((current (point))
              (keys (inspirehep-target-buffer-keys)))
@@ -422,30 +432,33 @@ Results are parsed with (BACKEND 'parse-buffer)."
        (set-buffer-modified-p nil))
 
 ;;;; Searching
-(defun inspirehep--lookup-url (url query target-buffer insert-p &optional insert-all-p)
-  "Display results from URL"
+(defun inspirehep--lookup-url (url query target-buffer new-p insert-p)
+  "Display results from URL.
+QUERY is used to construct the header. The TARGET-BUFFER determines where
+bibtex entries are inserted. NEW-P indicates a new query.
+INSERT-P determines how entries are inserted."
   (let* ((current (time-convert (current-time) 'integer))
          (len (length inspirehep--time-stamps))
          (elapsed (if (< 6 len) (- current (car (last inspirehep--time-stamps))) 0)))
     (if (or (> 7 len) (< 6 elapsed))
-        (let ((results-buffer (if insert-p (current-buffer)
+        (let ((results-buffer (if (and insert-p (not new-p)) (current-buffer)
                                 (inspirehep--make-results-buffer (funcall inspirehep-target-buffer-function) query target-buffer))))
           (cl-callf2 cons current inspirehep--time-stamps)
           (unless (> 7 len) (cl-callf butlast inspirehep--time-stamps))
-          (url-queue-retrieve url (inspirehep--callback results-buffer insert-p insert-all-p)) results-buffer)
-      (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url query target-buffer insert-p insert-all-p))))
+          (url-queue-retrieve url (inspirehep--callback results-buffer new-p insert-p)) results-buffer)
+      (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url query target-buffer new-p insert-p))))
 
 ;;;; Dealing with JSON from inspirehep
-(defun inspirehep-query-url (query) "Prepare url for an inspirehep search"
+(defun inspirehep-query-url (query) "Prepare url for an inspirehep search for QUERY."
        (concat "https://inspirehep.net/api/literature?q=" (url-hexify-string query) inspirehep-search-parameters))
 
-(defun inspirehep--author-with-id (auth) "Put AUTH with id as a text property on name"
+(defun inspirehep--author-with-id (auth) "Put AUTH with id as a text property on name."
        (let ((name (gethash "full_name" auth))
              (id  (seq-find (lambda (x) (equal "INSPIRE BAI" (gethash "schema" x))) (gethash "ids" auth))))
          (propertize (string-join (reverse (split-string name "," t " ")) " ")
                      'inspirehep-author-id (if id (gethash "value" id) name))))
 
-(defun inspirehep-parse-entry (entry) "Parse an entry retrieved from an inspirehep query in the inspirehep.el format"
+(defun inspirehep-parse-entry (entry) "Parse an ENTRY retrieved from an inspirehep query."
        (let* ((metadata (gethash "metadata" entry))
               (id (or (map-nested-elt metadata '("texkeys" 0)) (map-elt entry "id")))
               (id-end (nth 1 (split-string id ":" t " ")))
@@ -470,7 +483,7 @@ Results are parsed with (BACKEND 'parse-buffer)."
 (defun inspirehep-target-buffer-keys () "Key present in the target buffer."
        (seq-map #'car (when inspirehep--target-buffer (with-current-buffer inspirehep--target-buffer (bibtex-parse-keys)))))
 
-(defun inspirehep-make-entries (json) "Parse a json response from inspirehep"
+(defun inspirehep-make-entries (json) "Parse a JSON response from inspirehep."
         (list (map-nested-elt json '("links" "bibtex")) (map-nested-elt json '("links" "next")) (map-nested-elt json '("hits" "total"))
              (seq-map #'inspirehep-parse-entry (map-nested-elt json '("hits" "hits")))))
 
@@ -478,34 +491,37 @@ Results are parsed with (BACKEND 'parse-buffer)."
        (inspirehep-response-as-utf-8) (inspirehep-make-entries (json-parse-buffer)))
 
 ;;;; Dealing with BibTeX from inspirehep
-(defun inspirehep-parse-bibtex () "Parse bibtex entries retrieved from inspirehep"
+(defun inspirehep-parse-bibtex () "Parse bibtex entries retrieved from inspirehep."
        (seq-map (lambda (entry) (let ((beg (1+ (string-match "{" entry))) (end (string-match "," entry)))
                              (cons (substring-no-properties entry beg end) (concat "\n@" entry)))) (split-string (buffer-string) "@" t "\n")))
 
-(defun inspirehep-bibtex-callback (buffer)
+(defun inspirehep-bibtex-callback (buffer) "Prepare a callback for bibtex retrieval for entries in BUFFER."
   (lambda () (let ((bibtex (inspirehep-parse-bibtex))) (with-current-buffer buffer (cl-callf2 map-merge 'hash-table inspirehep-bibtex-entries bibtex)))))
 
-(defun inspirehep-retrieve-bibtex (buffer link) "Retrieve the bibtex entries corresponding to current query"
+(defun inspirehep-retrieve-bibtex (buffer link) "Retrieve the bibtex entries from LINK and store them in BUFFER."
        (url-queue-retrieve link (inspirehep-generic-url-callback (inspirehep-bibtex-callback buffer)) nil t))
 
 ;;;; Downloading Files
 (defun inspirehep-download (url newname &optional count)
   "Copy URL to NEWNAME asynchronously. Both arguments must be strings.
-Signal a `file-already-exists' error if file NEWNAME already
-exists."
+Signal a `file-already-exists' error if file NEWNAME already exists.
+COUNT is used to keep track of retries. Download is aborted after 5 retries."
   (if (file-exists-p newname) (signal 'file-already-exists (list "File already exists" newname))
     (if inspirehep--download-queue (cl-callf2 cons (list url newname) inspirehep--download-queue)
       (cl-callf2 cons (list url newname) inspirehep--download-queue) (inspirehep--download (if count count 1) url newname))))
 
-(defun inspirehep--download (count url newname) "Helper for `inspirehep-download'"
+(defun inspirehep--download (count url newname)
+  "Helper for `inspirehep-download'. See it for COUNT URL and NEWNAME."
        (if (> count 5) (progn (message "Failed to download %s" url) (inspirehep--downlaod-next))
          (url-queue-retrieve url #'inspirehep--download-callback (list count url newname))))
 
-(defun inspirehep--downlaod-next () "Download the next file in queue"
+(defun inspirehep--downlaod-next () "Download the next file in queue."
        (cl-callf butlast inspirehep--download-queue)
        (when inspirehep--download-queue (apply #'inspirehep--download 1 (car (last inspirehep--download-queue)))))
 
-(defun inspirehep--download-callback (status count url newname) "Callback for inspirehep-download"
+(defun inspirehep--download-callback (status count url newname)
+  "Callback for `inspirehep-download`.
+See it for COUNT URL and NEWNAME. STATUS is as in `url-retrieve'."
        (if-let ((errors (plist-get status :error)))
            (progn (princ errors) (run-with-timer 2 nil #'inspirehep--download (1+ count) url newname))
          (if-let ((handle (mm-dissect-buffer t))
@@ -518,26 +534,34 @@ exists."
 ;;;; Interactive Commands
 ;;;;;; Search
 ;;;###autoload
-(defun inspirehep-lookup (&optional query insert-all-p)
-  "Perform a search using BACKEND, and QUERY.
-Prompt for any missing or nil arguments.  BACKEND should be a
-function obeying the interface described in the docstring of
-`inspirehep-backends'.  Returns the buffer in which results will be
-inserted."
-  (interactive (list (read-string "InspireHEP: " nil 'inspirehep--search-history) inspirehep-insert-all))
-  (inspirehep--lookup-url (inspirehep-query-url query) (list query) (when (eq major-mode #'inspirehep-mode) (current-buffer)) nil insert-all-p))
+(defun inspirehep-lookup (&optional query all-p)
+  "Perform a search for QUERY.
+If ALL-P is non-nil insert all results otherwise only the first page."
+  (interactive (list (read-string "InspireHEP: " nil 'inspirehep--search-history) (when inspirehep-insert-all 'all)))
+  (inspirehep--lookup-url (inspirehep-query-url query) (list query) (when (eq major-mode #'inspirehep-mode) (current-buffer)) t all-p))
 
-(defun inspirehep-next-page (insert-p &optional insert-all-p) "Return the next page of search results for the current query" (interactive (list t))
-       (if-let (((eq major-mode #'inspirehep-mode)) (url inspirehep--link-next))
-           (inspirehep--lookup-url url inspirehep--search-terms (current-buffer) insert-p insert-all-p)
-         (message "Already at the last page of current search")))
+(defun inspirehep-next-page (insert-p)
+  "Insert the next page of search results for the current query.
+If INSERT-P is non-nill insert them at the end of current buffer. Otherwise
+insert them after earsing the buffer. If INSERT-P is non-nill insert all pages
+one by one."
+  (interactive (list t))
+  (if-let (((eq major-mode #'inspirehep-mode)) (url inspirehep--link-next))
+      (inspirehep--lookup-url url inspirehep--search-terms (current-buffer) nil insert-p)
+    (message "Already at the last page of current search")))
 
-(defun inspirehep-search-citations (insert-all-p) "Get the citations for the current selection" (interactive (list inspirehep-insert-all))
+(defun inspirehep-search-citations (all-p)
+  "Get the citations for the current selection.
+If ALL-P is non-nil insert all results otherwise only the first page."
+  (interactive (list (when inspirehep-insert-all 'all)))
        (inspirehep--lookup-url (inspirehep-lookup-at-point 'citations-url)
                                (cons (car inspirehep--search-terms) (concat "Citations for " "“" (inspirehep-lookup-at-point 'title) "”"))
-                               (current-buffer) nil insert-all-p))
+                               (current-buffer) t all-p))
 
-(defun inspirehep-search-author (insert-all-p) "Search the articles by the author at point" (interactive (list inspirehep-insert-all))
+(defun inspirehep-search-author (all-p)
+  "Search the articles by the author at point.
+If ALL-P is non-nil insert all results otherwise only the first page."
+  (interactive (list (when inspirehep-insert-all 'all)))
        (let* ((author-at-point (get-text-property (point) 'inspirehep-author-id))
               (auth (if author-at-point author-at-point
                       (let* ((candidates  (inspirehep-lookup-at-point 'authors))
@@ -545,21 +569,21 @@ inserted."
                         (get-text-property 0 'inspirehep-author-id (car (member candidate candidates)))))))
          (inspirehep--lookup-url (inspirehep-query-url (concat "a " auth))
                                  (cons (car inspirehep--search-terms) (concat "Articles by " "“" auth "”"))
-                                 (current-buffer) nil insert-all-p)))
+                                 (current-buffer) t all-p)))
 
 ;;;;;; Bibtex and PDF
-(defun inspirehep-insert-bibtex (key saved) "Insert the bibtex corresponding to KEY in the target buffer"
+(defun inspirehep-insert-bibtex (key saved) "Insert the bibtex corresponding to KEY in the target buffer unless SAVED ."
        (interactive (list (inspirehep-lookup-at-point 'identifier) (inspirehep-lookup-at-point 'saved)))
        (unless saved (let ((bib (map-elt inspirehep-bibtex-entries key)))
                        (with-current-buffer inspirehep--target-buffer (goto-char (point-max)) (insert bib) (save-buffer)))
                (inspirehep-re-insert-entry-at-point (inspirehep-target-buffer-keys))))
 
-(defun inspirehep-download-pdf (url name) "Download the pdf using the metadata.
-The file is stored in the directory specified by `inspirehep-download-directory'"
+(defun inspirehep-download-pdf (url name) "Download the pdf from URL .
+The file is stored as NAME in the directory `inspirehep-download-directory'"
        (interactive (list (inspirehep-lookup-at-point 'direct-url) (concat inspirehep-download-directory (inspirehep-lookup-at-point 'filename))))
        (inspirehep-download url name))
 
-(defun inspirehep-insert-and-download () "Insert the bibtex entry and download the pdf from METADATA"
+(defun inspirehep-insert-and-download () "Insert the current bibtex entry and download the pdf."
        (interactive)
        (with-demoted-errors "Downlaod: %S" (call-interactively #'inspirehep-download-pdf)) (call-interactively #'inspirehep-insert-bibtex))
 
@@ -589,13 +613,13 @@ The file is stored in the directory specified by `inspirehep-download-directory'
   (inspirehep--selection-move #'beginning-of-line #'re-search-backward))
 
 ;;;;;; Hiding and showing details
-(defun inspirehep-toggle-details (ov) "Toggle the visibility of details for current entry" (interactive (list (inspirehep-details-overlay)))
+(defun inspirehep-toggle-details (ov) "Toggle the visibility of details overlay OV for current entry." (interactive (list (inspirehep-details-overlay)))
        (overlay-put ov 'invisible (not (overlay-get ov 'invisible))))
 
-(defun inspirehep-hide-details-all () "Hide the details for all entries" (interactive)
+(defun inspirehep-hide-details-all () "Hide the details for all entries." (interactive)
        (seq-do (lambda (ov) (when (overlay-get ov 'details) (overlay-put ov 'invisible t))) (overlays-in (point-min) (point-max))))
 
-(defun inspirehep-show-details-all () "Show the details for all entries" (interactive)
+(defun inspirehep-show-details-all () "Show the details for all entries." (interactive)
        (seq-do (lambda (ov) (when (overlay-get ov 'details) (overlay-put ov 'invisible nil))) (overlays-in (point-min) (point-max))))
 
 ;;;;;; Miscellaneous
