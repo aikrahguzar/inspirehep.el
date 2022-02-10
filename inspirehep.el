@@ -245,23 +245,21 @@ request returns another error, an exception is raised."
        (map-elt (inspirehep--selection-metadata-at-point) key))
 
 ;;;; Printing search results
-(defun inspirehep-insert-with-prefix (prefix &rest strs)
-  "Like INSERT with PREFIX and STRS, but set `wrap-prefix'.
-That is, the inserted text gets a `wrap-prefix' made of enough
-white space to align with the end of PREFIX."
+(defun inspirehep-insert-with-prefix (prefix wrap &rest strs)
+  "Like INSERT with PREFIX and STRS, but also set `wrap-prefix' to WRAP."
   (declare (indent 1))
-  (inspirehep--with-text-property 'wrap-prefix (make-string (length prefix) ?\s)
-    (apply #'insert prefix strs)))
+  (inspirehep--with-text-property 'wrap-prefix wrap (apply #'insert prefix strs)))
 
-(defun inspirehep--insert-detail (prefix items newline)
+(defun inspirehep--insert-detail (prefix items newline &optional wrap)
   "Insert PREFIX followed by ITEMS, if ITEMS has non-empty entries.
-If ITEMS is a list or vector, join its entries with “, ”.  If
-NEWLINE is non-nil, add a newline before the main text."
+If ITEMS is a list or vector, join its entries with “, ”.  If NEWLINE is
+non-nil, add a newline before the main text. If WRAP is given use it as
+`wrap-prefix' otherwise use spaces equal to the length of PREFIX"
   (when (or (vectorp items) (listp items))
     (setq items (string-join items ", ")))
   (unless (seq-empty-p items)
     (when newline (insert "\n"))
-    (inspirehep-insert-with-prefix prefix items)))
+    (inspirehep-insert-with-prefix prefix (if wrap wrap (make-string (length prefix) ?\s)) items)))
 
 (defun inspirehep--prepare-authors (auths)
   "Cleanup and join list of authors AUTHS."
@@ -318,7 +316,7 @@ With LOADING-P, mention that results are being loaded."
   "Insert the TITLE and YEAR for the entry.
 Non-nil SAVED-P means that the entry is present in the target buffer."
        (inspirehep-with-fontification (if saved-p 'match 'bold)
-          (inspirehep-insert-with-prefix inspirehep-search-result-marker (inspirehep--prepare-title title year))))
+          (inspirehep-insert-with-prefix inspirehep-search-result-marker "  " (inspirehep--prepare-title title year))))
 
 (defun inspirehep-insert-result (item saved-p &optional no-sep)
   "Print a (prepared) inspirehep search result ITEM.
@@ -353,9 +351,10 @@ provide examples of how to build such a result."
         (inspirehep-insert-result-title saved-p .title .year)
         (insert "\n")
         (inspirehep-with-fontification 'font-lock-function-name-face
-          (inspirehep-insert-with-prefix "  " (inspirehep--prepare-authors .authors)))
+          (inspirehep-insert-with-prefix "  " "  " (inspirehep--prepare-authors .authors)))
         (inspirehep-make-overlay
-         (inspirehep--insert-detail "  " .abstract t)
+         (inspirehep--with-text-property 'line-prefix "  "
+           (inspirehep--insert-detail "" .abstract t "  "))
          (inspirehep-with-fontification 'font-lock-comment-face
            (inspirehep--insert-detail "  In: " .container t)
            (inspirehep--insert-detail "  Publisher: " .publisher t)
