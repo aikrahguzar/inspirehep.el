@@ -565,12 +565,13 @@ If ALL-P is non-nil insert all results otherwise only the first page."
                                  (current-buffer) (if all-p 'new-all 'new-page))))
 
 ;;;;;; Bibtex and PDF
-(defun inspirehep-insert-bibtex (key saved) "Insert the bibtex corresponding to KEY in the target buffer unless SAVED ."
-       (interactive (list (inspirehep-lookup-at-point 'identifier) (inspirehep-lookup-at-point 'saved)))
-       (unless saved (let ((bib (map-elt inspirehep-bibtex-entries key)))
-                       (with-current-buffer (or inspirehep--target-buffer (call-interactively #'inspirehep-select-target-buffer))
-                         (goto-char (point-max)) (insert bib) (save-buffer)))
-               (inspirehep-re-insert-entry-at-point (inspirehep-target-buffer-keys))))
+(defun inspirehep-insert-bibtex (key) "Insert the bibtex corresponding to KEY in the target buffer unless SAVED ."
+       (interactive (list (inspirehep-lookup-at-point 'identifier)))
+       (when-let ((bib (map-elt inspirehep-bibtex-entries key))
+                  (target (or inspirehep--target-buffer (call-interactively #'inspirehep-select-target-buffer)))
+                  ((get-text-property (point) 'inspirehep-saved)))
+         (with-current-buffer target (goto-char (point-max)) (insert bib) (save-buffer)))
+       (inspirehep-re-insert-entry-at-point (inspirehep-target-buffer-keys)))
 
 (defun inspirehep-download-pdf (url name) "Download the pdf from URL .
 The file is stored as NAME in the directory `inspirehep-download-directory'"
@@ -625,7 +626,8 @@ BUFFER-NAME is the name of the new target buffer."
   (let ((buffer (get-buffer buffer-name)))
     (if (buffer-local-value 'buffer-read-only buffer)
         (user-error "%s is read-only" (buffer-name buffer))
-      (setq inspirehep--target-buffer buffer))))
+      (setq inspirehep--target-buffer buffer)
+      (revert-buffer))))
 
 (defun inspirehep-kill-buffers ()
   "Kill all `inspirehep-mode' buffers."
