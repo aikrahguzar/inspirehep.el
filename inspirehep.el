@@ -365,7 +365,8 @@ provide examples of how to build such a result."
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer ()
   "Make a new inspirehep-mode buffer."
-  (let ((target-buffer (funcall inspirehep-target-buffer-function)))
+  (let ((target-buffer (funcall inspirehep-target-buffer-function))
+        (inhibit-read-only t))
     (with-current-buffer (get-buffer-create "* INSPIRE HEP *")
     (erase-buffer) (inspirehep-mode) (setq buffer-read-only t inspirehep--target-buffer target-buffer) (current-buffer))))
 
@@ -569,7 +570,7 @@ If ALL-P is non-nil insert all results otherwise only the first page."
        (interactive (list (inspirehep-lookup-at-point 'identifier)))
        (when-let ((bib (map-elt inspirehep-bibtex-entries key))
                   (target (or inspirehep--target-buffer (call-interactively #'inspirehep-select-target-buffer)))
-                  ((get-text-property (point) 'inspirehep-saved)))
+                  ((not (get-text-property (point) 'inspirehep-saved))))
          (with-current-buffer target (goto-char (point-max)) (insert bib) (save-buffer)))
        (inspirehep-re-insert-entry-at-point (inspirehep-target-buffer-keys)))
 
