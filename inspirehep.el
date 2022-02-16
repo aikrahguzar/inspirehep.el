@@ -86,7 +86,10 @@ are fectched one after another and inserted into the buffer as they arrive."
 
 (defvar inspirehep--search-history nil)
 
-(defvar inspirehep-search-parameters "&size=25&sort=mostrecent&fields=titles.title,authors.full_name,authors.ids,abstracts,arxiv_eprints,documents.url,texkeys,preprint_date,imprints.date"
+(defvar inspirehep-search-parameters '((fields "titles.title" "authors.full_name" "authors.ids" "abstracts" "arxiv_eprints" "documents.url" "texkeys"
+                                               "preprint_date" "imprints.date")
+                                       (size   . 25) (sort   . "mostrecent"))
+  ;; "&size=25&sort=mostrecent&fields=titles.title,authors.full_name,authors.ids,abstracts,arxiv_eprints,documents.url,texkeys,preprint_date,imprints.date"
   "Determines the number of results, sort order and fields retrieved.")
 
 (defvar inspirehep--time-stamps nil "Variable for rate limiting requests.")
@@ -205,12 +208,15 @@ request returns another error, an exception is raised."
        ,@body
        (font-lock-append-text-property ,beg-var (point) 'face ,face))))
 
-(defmacro inspirehep-make-overlay (&rest body)
-  "Put the overlay indacting details over text inserted by BODY ."
-  (let ((beg-var (make-symbol "beg")))
+(defmacro inspirehep-make-overlay (invisible &rest body)
+  "Put the overlay indacting details over text inserted by BODY.
+Set the invisible property of the overlay to INVISIBLE."
+  (let ((beg-var (make-symbol "beg"))
+        (ov-var (make-symbol "ov")))
     `(let ((,beg-var (point)))
        ,@body
-       (overlay-put (make-overlay ,beg-var (point)) 'details t))))
+       (let ((,ov-var (make-overlay ,beg-var (point))))
+         (overlay-put ,ov-var 'details t) (overlay-put ,ov-var 'invisible ,invisible) ,ov-var))))
 
 (defun inspirehep-details-overlay () "Return the details overlay of the entry at point."
        (seq-find (lambda (ov) (overlay-get ov 'details)) (overlays-at (1- (cdr (get-text-property (point) 'inspirehep-entry-bounds))))))
@@ -221,12 +227,12 @@ request returns another error, an exception is raised."
   (let ((target nil))
     (save-excursion
       (funcall move-fn)
-      (when (funcall search-fn (concat "^" inspirehep-search-result-marker) nil t)
+      (when (funcall search-fn (concat "^\\(?:" inspirehep-search-result-marker "\\|\\[[[:alnum:]]*]\\)") nil t)
         (setq target (match-end 0))))
-    (when target (goto-char target)
-          (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
-                   ((not (pos-visible-in-window-p entry-end))))
-              (set-window-start (selected-window) (- target 2))))))
+    (prog1 target (when target (goto-char target)
+                        (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
+                                 ((not (pos-visible-in-window-p entry-end))))
+                            (set-window-start (selected-window) (- target 2)))))))
 
 (defun inspirehep--selection-first ()
   "Move to first search result."
@@ -310,35 +316,39 @@ If MATCH-P is non-nill add match to the faces."
           (insert header "\n"))))))
 
 ;;;;;; Insert resut
-(defun inspirehep-insert-result-title (saved-p title year)
+(defun inspirehep-insert-result-title (saved-p title year marker)
   "Insert the TITLE and YEAR for the entry.
-Non-nil SAVED-P means that the entry is present in the target buffer."
-       (inspirehep-with-fontification (if saved-p 'match 'bold)
-          (inspirehep-insert-with-prefix inspirehep-search-result-marker "  " (inspirehep--prepare-title title year))))
+Non-nil SAVED-P means that the entry is present in the target buffer. MARKER is
+inserted at the beginning."
+  (inspirehep-with-fontification (if saved-p 'match 'bold)
+                                 (inspirehep-insert-with-prefix marker (make-string (string-width marker) ?\s) (inspirehep--prepare-title title year))))
 
-(defun inspirehep-insert-result (item saved-p &optional no-sep)
+(defun inspirehep-insert-result (item saved-p &optional marker)
   "Print a (prepared) inspirehep search result ITEM.
 With NO-SEP, do not add space after the record. Non-nil SAVED-P means that
-the entry is present in the target buffer."
-  (let ((beg (point)))
+the entry is present in the target buffer. MARKER is inserted at the beginning
+and defaults to `inspirehep-search-result-marker'"
+  (let* ((beg (point))
+        (marker (or marker inspirehep-search-result-marker))
+        (spaces (make-string (string-width marker) ?\s)))
     (inspirehep--with-text-property 'inspirehep-saved saved-p
      (inspirehep--with-text-property 'inspirehep-metadata item
       (let-alist item
-        (inspirehep-insert-result-title saved-p .title .year)
+        (inspirehep-insert-result-title saved-p .title .year marker)
         (insert "\n")
         (inspirehep-with-fontification 'font-lock-function-name-face
-          (inspirehep-insert-with-prefix "  " "  " (inspirehep--prepare-authors .authors)))
-        (inspirehep-make-overlay
-         (inspirehep--with-text-property 'line-prefix "  "
-           (inspirehep--insert-detail "" .abstract t "  "))
+          (inspirehep-insert-with-prefix spaces spaces (inspirehep--prepare-authors .authors)))
+        (inspirehep-make-overlay nil
+         (inspirehep--with-text-property 'line-prefix spaces
+           (inspirehep--insert-detail "" .abstract t spaces))
          (inspirehep-with-fontification 'font-lock-comment-face
-           (inspirehep--insert-detail "  In: " .container t)
-           (inspirehep--insert-detail "  Publisher: " .publisher t)
-           (inspirehep--insert-detail "  arXiv: " .arXiv t)
-           (inspirehep--insert-detail "  URL: " (list (inspirehep-make-url-button .url)
+           (inspirehep--insert-detail (concat spaces "In: ") .container t)
+           (inspirehep--insert-detail (concat spaces "Publisher: ") .publisher t)
+           (inspirehep--insert-detail (concat spaces "arXiv: ") .arXiv t)
+           (inspirehep--insert-detail (concat spaces "URL: ") (list (inspirehep-make-url-button .url)
                                                       (inspirehep-make-url-button .direct-url)) t))))))
     (put-text-property beg (point) 'inspirehep-entry-bounds (cons beg (point))))
-  (unless no-sep (insert "\n\n")))
+  (insert "\n\n"))
 
 (defun inspirehep-detailed-record (item saved-p)
   "Print a (prepared) inspirehep record ITEM.
@@ -360,7 +370,8 @@ This is meant to show a single literature record and erases the buffer."
            (inspirehep--insert-detail "URL: " (list (inspirehep-make-url-button .url)
                                                       (inspirehep-make-url-button .direct-url)) t))
         (when .references (inspirehep-with-fontification 'bold (insert "\n\n" "References:"))
-                 (seq-do (lambda (ref) (inspirehep--insert-detail inspirehep-search-result-marker ref t "  ")) .references))))))
+                 (seq-do (lambda (ref) (inspirehep-with-fontification (when (equal "" (map-elt (get-text-property 0 'reference ref) 'recid)) 'font-lock-comment-face)
+                                                                 (inspirehep--insert-detail "" ref t "  "))) .references))))))
 
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer ()
@@ -413,9 +424,11 @@ NEW-P indicates a new query."
 (defun inspirehep--single-record-callback (results-buffer)
   "Generate a callback to insert a single record into RESULTS-BUFFER."
   (inspirehep-generic-url-callback
-   (lambda () (let ((parsed-data (progn (inspirehep-response-as-utf-8) (inspirehep-parse-single-record (json-parse-buffer))))
-               (inhibit-read-only t))
-           (with-current-buffer results-buffer (inspirehep-detailed-record parsed-data (inspirehep-target-buffer-keys)))))))
+   (lambda () (let* ((parsed-data (progn (inspirehep-response-as-utf-8) (inspirehep-parse-single-record (json-parse-buffer))))
+                (recids (seq-remove (lambda (x) (equal x "")) (seq-map (lambda (str) (map-elt (get-text-property 0 'reference str) 'recid)) (map-elt parsed-data 'references))))
+                (inhibit-read-only t))
+           (with-current-buffer results-buffer (setq inspirehep--link-next (inspirehep-query-url (concat "recid:(" (string-join recids " or ") ")") 200))
+                                               (inspirehep-detailed-record parsed-data (inspirehep-target-buffer-keys)) (goto-char (point-min)))))))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
        (let* ((bounds (get-text-property (point) 'inspirehep-entry-bounds))
@@ -449,8 +462,16 @@ bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
       (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url query results-buffer result-type))))
 
 ;;;; Dealing with JSON from inspirehep
-(defun inspirehep-query-url (query) "Prepare url for an inspirehep search for QUERY."
-       (concat "https://inspirehep.net/api/literature?q=" (url-hexify-string query) inspirehep-search-parameters))
+(defun inspirehep--search-parameters (&optional size sort fields) "See `inspirehep-query-url' for SIZE, SORT and FIELDS."
+       (concat "&size=" (number-to-string (or size (map-elt inspirehep-search-parameters 'size)))
+          "&sort=" (or sort (map-elt inspirehep-search-parameters 'sort)) "&fields=" (string-join (or fields (map-elt inspirehep-search-parameters 'fields)) ",")))
+
+(defun inspirehep-query-url (query &optional size sort &rest fields)
+  "Prepare url for an inspirehep search for QUERY.
+SIZE is the number of entries per page, SORT is the sort order and the FIELDS
+determines the fields from the response. If absent they are deterimend using
+`inspirehep-search-parameters'."
+  (concat "https://inspirehep.net/api/literature?q=" (url-hexify-string query) (inspirehep--search-parameters size sort fields)))
 
 (defun inspirehep--author-with-id (auth) "Put AUTH with id as a text property on name."
        (let ((name (gethash "full_name" auth))
@@ -477,15 +498,18 @@ bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
                (cons 'api-url (concat "https://inspirehep.net/api/literature/" (gethash "id" entry)))
                (cons 'arxiv-url (when arxiv-id (concat "https://arxiv.org/abs/" arxiv-id)))
                (cons 'direct-url (if arxiv-id (concat "https://export.arxiv.org/pdf/" arxiv-id) (map-nested-elt metadata '("documents" 0 "url"))))
-               (cons 'citations-url (concat (map-nested-elt entry '("links" "citations")) inspirehep-search-parameters))
+               (cons 'citations-url (concat (map-nested-elt entry '("links" "citations")) (inspirehep--search-parameters)))
                (cons 'abstract  (map-elt (let ((as (map-elt metadata "abstracts"))) (map-elt as (1- (length as)))) "value"))
                (cons 'filename (string-replace "\\" "" (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
 
 (defun inspirehep-parse-reference (ref) "Parse the reference REF."
-       (propertize (map-nested-elt ref '("raw_refs" 0 "value") " ")
-                   'reference (list (cons 'authors (seq-map (lambda (x) (map-elt x "full_name")) (map-nested-elt ref '("reference" "authors"))))
-                                    (cons 'label (map-nested-elt ref '("reference" "label")))
-                                    (cons 'url (map-nested-elt ref '("record" "$ref"))))))
+       (let* ((reference (map-elt ref "reference"))
+              (label (map-elt reference "label"))
+              (url (map-nested-elt ref '("record" "$ref")))
+              (authorlist (seq-map (lambda (x) (map-elt x "full_name")) (map-elt reference "authors")))
+              (constructed (concat "[" (or label "") "] " (string-join authorlist " ") " " (map-nested-elt reference '("title" "title") ""))))
+         (propertize (map-nested-elt ref '("raw_refs" 0 "value") constructed)
+                     'reference (list (cons 'authors authorlist) (cons 'label label) (cons 'url url) (cons 'recid (url-file-nondirectory url))))))
 
 (defun inspirehep-parse-single-record (json) "Parse JSON for single literature records from inpire."
        (append (inspirehep-parse-entry json) (list (cons 'references (seq-map #'inspirehep-parse-reference (map-nested-elt json '("metadata" "references")))))))
@@ -627,7 +651,7 @@ The file is stored as NAME in the directory `inspirehep-download-directory'"
 (defun inspirehep--selection-previous ()
   "Move to previous search result."
   (interactive)
-  (inspirehep--selection-move #'beginning-of-line #'re-search-backward))
+  (or (inspirehep--selection-move #'beginning-of-line #'re-search-backward) (goto-char (point-min))))
 
 ;;;;;; Hiding and showing details
 (defun inspirehep-toggle-details (ov) "Toggle the visibility of details overlay OV for current entry." (interactive (list (inspirehep-details-overlay)))
