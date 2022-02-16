@@ -227,7 +227,7 @@ Set the invisible property of the overlay to INVISIBLE."
   (let ((target nil))
     (save-excursion
       (funcall move-fn)
-      (when (funcall search-fn (concat "^\\(?:" inspirehep-search-result-marker "\\|\\[[[:alnum:]]*]\\)") nil t)
+      (when (funcall search-fn (concat "^\\(?:" (regexp-quote inspirehep-search-result-marker) "\\|\\[[[:alnum:]]*]\\)") nil t)
         (setq target (match-end 0))))
     (prog1 target (when target (goto-char target)
                         (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
@@ -370,8 +370,10 @@ This is meant to show a single literature record and erases the buffer."
            (inspirehep--insert-detail "URL: " (list (inspirehep-make-url-button .url)
                                                       (inspirehep-make-url-button .direct-url)) t))
         (when .references (inspirehep-with-fontification 'bold (insert "\n\n" "References:"))
-                 (seq-do (lambda (ref) (inspirehep-with-fontification (when (equal "" (map-elt (get-text-property 0 'reference ref) 'recid)) 'font-lock-comment-face)
-                                                                 (inspirehep--insert-detail "" ref t "  "))) .references))))))
+              (seq-do (lambda (ref) (let* ((reference (get-text-property 0 'reference ref))
+                                      (label (concat "[" (or (map-elt reference 'label) "") "] ")))
+                                 (inspirehep-with-fontification (when (equal "" (map-elt reference 'recid)) 'font-lock-comment-face)
+                                                                (inspirehep--insert-detail label ref t (make-string (length label) ?\s))))) .references))))))
 
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer ()
@@ -427,7 +429,7 @@ NEW-P indicates a new query."
    (lambda () (let* ((parsed-data (progn (inspirehep-response-as-utf-8) (inspirehep-parse-single-record (json-parse-buffer))))
                 (recids (seq-remove (lambda (x) (equal x "")) (seq-map (lambda (str) (map-elt (get-text-property 0 'reference str) 'recid)) (map-elt parsed-data 'references))))
                 (inhibit-read-only t))
-           (with-current-buffer results-buffer (setq inspirehep--link-next (inspirehep-query-url (concat "recid:(" (string-join recids " or ") ")") 200))
+           (with-current-buffer results-buffer (setq inspirehep--link-next (inspirehep-query-url (concat "recid:(" (string-join recids " or ") ")") 1000))
                                                (inspirehep-detailed-record parsed-data (inspirehep-target-buffer-keys)) (goto-char (point-min)))))))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
@@ -507,8 +509,10 @@ determines the fields from the response. If absent they are deterimend using
               (label (map-elt reference "label"))
               (url (map-nested-elt ref '("record" "$ref")))
               (authorlist (seq-map (lambda (x) (map-elt x "full_name")) (map-elt reference "authors")))
-              (constructed (concat "[" (or label "") "] " (string-join authorlist " ") " " (map-nested-elt reference '("title" "title") ""))))
-         (propertize (map-nested-elt ref '("raw_refs" 0 "value") constructed)
+              (raw (map-nested-elt ref '("raw_refs" 0 "value")))
+              (start-pos (1+ (string-search " " raw (string-search label raw))))
+              (constructed (concat (string-join authorlist " ") " " (map-nested-elt reference '("title" "title") ""))))
+         (propertize (or (when raw (substring raw start-pos)) constructed)
                      'reference (list (cons 'authors authorlist) (cons 'label label) (cons 'url url) (cons 'recid (url-file-nondirectory url))))))
 
 (defun inspirehep-parse-single-record (json) "Parse JSON for single literature records from inpire."
