@@ -162,6 +162,10 @@ This variable is local to each search results buffer.")
         (pop plist)))
     (nreverse res)))
 
+(defun inspirehep-map-apply (map keys func &rest args)
+  "Return FUNC applied to value of nested KEYS and ARGS in MAP unless nill."
+  (let ((val (map-nested-elt map keys))) (when val (apply func val args))))
+
 (defun inspirehep--extract-errors (events)
   "Extract errors from EVENTS."
   (seq-map #'cdr (inspirehep--plist-get-all events :error)))
@@ -529,14 +533,14 @@ determines the fields from the response. If absent they are deterimend using
                (cons 'authors (seq-map #'inspirehep--author-with-id (gethash "authors" metadata)))
                (cons 'tex-keys (map-elt metadata "texkeys"))
                (cons 'arXiv (seq-map (lambda (e) (concat (map-nested-elt e '("categories" 0)) ":" (gethash "value" e))) (gethash "arxiv_eprints" metadata)))
-               (cons 'url (concat "https://inspirehep.net/literature/" (gethash "id" entry)))
+               (cons 'url (inspirehep-map-apply entry '("id") (lambda (id) (concat "https://inspirehep.net/literature/" id))))
                (cons 'recid (gethash "id" entry))
                (cons 'arxiv-url (when arxiv-id (concat "https://arxiv.org/abs/" arxiv-id)))
                (cons 'direct-url (if arxiv-id (concat "https://export.arxiv.org/pdf/" arxiv-id) (map-nested-elt metadata '("documents" 0 "url"))))
-               (cons 'citations-url (concat (map-nested-elt entry '("links" "citations")) (inspirehep--search-parameters)))
+               (cons 'citations-url (inspirehep-map-apply entry '("links" "citations") #'concat (inspirehep--search-parameters)))
                (cons 'abstract  (map-elt (let ((as (map-elt metadata "abstracts"))) (map-elt as (1- (length as)))) "value"))
                (cons 'filename (string-replace "\\" "" (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
-
+;; (concat "https://inspirehep.net/literature/" (gethash "id" entry))
 (defun inspirehep-parse-reference (ref) "Parse the reference REF."
        (if-let ((url (map-nested-elt ref '("record" "$ref"))))
            (list (cons 'recid (when url (url-file-nondirectory url))) (cons 'label (map-nested-elt ref '("reference" "label"))))
