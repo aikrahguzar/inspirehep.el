@@ -319,7 +319,7 @@ If MATCH-P is non-nill add match to the faces."
   (when header
     (inspirehep--with-text-property 'line-spacing 0.5
       (inspirehep--with-text-property 'line-height 1.75
-        (inspirehep-with-fontification (list 'inspirehep-results-header-face (when match-p 'match))
+        (inspirehep-with-fontification (list (when match-p 'match) 'inspirehep-results-header-face)
           (insert header "\n"))))))
 
 ;;;;;; Insert resut
@@ -446,7 +446,9 @@ NEW-P indicates a new query."
                 (inhibit-read-only t))
            (when refurls (inspirehep--lookup-url (car refurls) "" results-buffer 'single-record-references))
            (inspirehep-retrieve-bibtex results-buffer (nth 2 parsed-data))
-           (with-current-buffer results-buffer (inspirehep-detailed-record (car parsed-data) (inspirehep-target-buffer-keys)) (insert "\n\n")
+           (with-current-buffer results-buffer (inspirehep-detailed-record (car parsed-data)
+                                                                           (seq-contains-p (inspirehep-target-buffer-keys) (map-elt (car parsed-data) 'identifier)))
+                                (insert "\n\n")
                                 (inspirehep-with-fontification 'bold (insert "References:" "\n"))
                                 (setq inspirehep--references-to-insert (nth 1 parsed-data))
                                 (setq inspirehep--link-next (cdr refurls)))))))
