@@ -7,8 +7,7 @@
 
 Quick start: `M-x inspirehep-lookup`.
 
-These commands work together: for example, `crossref-lookup` displays a
-list of results in `inspirehep-mode`.  In that mode, use:
+This displays a list of results in `inspirehep-mode`.  In that mode, use:
 
 * `i` (`inspirehep-insert-bibtex`) to insert the BibTeX record of the current entry. 
 * `b` (`inspirehep-select-target-buffer`) to change the file in which the BibTeX files will be inserted.
@@ -16,6 +15,7 @@ list of results in `inspirehep-mode`.  In that mode, use:
 from arXiv. Otherwise the first document link from record received from INSPIRE is used. This should be improved.
 * `s` (`inspirehep-insert-and-download`) to both insert the BibTeX entry and download the file.
 * `c` (`inspirehep-search-citations`) to search for articles that cite the current article. 
+* `e` (`inspirehep-view-entry`) to view the detailed record for the entry including reference in the article.
 * `a` (`inspirehep-search-author`) to search for the articles by the author at the point. If there is an author at point, you will be prompted to select one of
   the authors of the current entry.
 * `r` (`inspirehep-lookup`) to start a new search.
