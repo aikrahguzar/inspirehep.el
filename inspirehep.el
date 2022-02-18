@@ -334,7 +334,8 @@ inserted at the beginning."
   "Print a (prepared) inspirehep search result ITEM.
 With NO-SEP, do not add space after the record. Non-nil SAVED-P means that
 the entry is present in the target buffer. MARKER is inserted at the beginning
-and defaults to `inspirehep-search-result-marker'"
+and defaults to `inspirehep-search-result-marker'. Non-nil DETAILS-INVISIBLE-P
+means that details overlay starts as invisible"
   (let* ((beg (point))
         (marker (or marker inspirehep-search-result-marker))
         (spaces (make-string (string-width marker) ?\s)))
@@ -377,18 +378,16 @@ This is meant to show a single literature record and erases the buffer."
            (inspirehep--insert-detail "URL: " (list (inspirehep-make-url-button .url)
                                                       (inspirehep-make-url-button .direct-url)) t))))))
 
-(defun inspirehep--insert-reference (parsed-refs keys) "Insert a reference using PARSED-REFS and KEYS."
-       (let* ((cref (car inspirehep--references-to-insert))
-              (rfid (map-elt cref 'recid))
+(defun inspirehep--insert-reference (ref parsed-refs keys) "Insert a reference REF using PARSED-REFS and KEYS."
+       (let* ((rfid (map-elt ref 'recid))
               (pref (seq-find (lambda (p) (equal (map-elt p 'recid) rfid)) parsed-refs))
-              (label (concat "[" (map-elt cref 'label "") "] ")))
-         (if pref (inspirehep-insert-result pref (not (null (seq-intersection (map-elt pref 'tex-keys) keys))) label t)
-           (unless rfid (inspirehep-with-fontification 'font-lock-comment-face
-                           (if-let (raw-ref (map-elt cref 'reference))
-                               (progn (inspirehep--insert-detail label raw-ref nil (make-string (length label) ?\s))
-                                      (insert "\n\n"))
-                             (inspirehep-insert-result cref nil label t)))))
-         (unless (and rfid (not pref)) (cl-callf cdr inspirehep--references-to-insert) t)))
+              (label (concat "[" (map-elt ref 'label "") "] ")))
+         (if pref (prog1 t (inspirehep-insert-result pref (not (null (seq-intersection (map-elt pref 'tex-keys) keys))) label t))
+           (unless rfid (prog1 t (inspirehep-with-fontification 'font-lock-comment-face
+                                    (if-let (raw-ref (map-elt ref 'reference))
+                                        (progn (inspirehep--insert-detail label raw-ref nil (make-string (length label) ?\s))
+                                               (insert "\n\n"))
+                                      (inspirehep-insert-result ref nil label t))))))))
 
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer ()
@@ -460,13 +459,15 @@ NEW-P indicates a new query."
            (with-current-buffer results-buffer
              (when inspirehep--link-next (inspirehep--lookup-url (car inspirehep--link-next) "" results-buffer 'single-record-references)
                    (cl-callf cdr inspirehep--link-next))
-             (setq inspirehep--search-terms parsed-data)
              (inspirehep-retrieve-bibtex results-buffer (car parsed-data))
              (save-excursion (let ((keys (inspirehep-target-buffer-keys))
                                    (continue t))
                                (goto-char (point-max))
                                (while (and continue inspirehep--references-to-insert)
-                                 (setq continue (inspirehep--insert-reference (nth 3 parsed-data) keys))))))))))
+                                 (if (inspirehep--insert-reference (car inspirehep--references-to-insert) (nth 3 parsed-data) keys)
+                                     (cl-callf cdr inspirehep--references-to-insert)
+                                   (setq continue nil)))))
+             (unless inspirehep--link-next (set-buffer-modified-p nil) (message "Done inserting the record.")))))))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
        (let* ((bounds (get-text-property (point) 'inspirehep-entry-bounds))
@@ -540,7 +541,7 @@ determines the fields from the response. If absent they are deterimend using
                (cons 'citations-url (inspirehep-map-apply entry '("links" "citations") #'concat (inspirehep--search-parameters)))
                (cons 'abstract  (map-elt (let ((as (map-elt metadata "abstracts"))) (map-elt as (1- (length as)))) "value"))
                (cons 'filename (string-replace "\\" "" (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
-;; (concat "https://inspirehep.net/literature/" (gethash "id" entry))
+
 (defun inspirehep-parse-reference (ref) "Parse the reference REF."
        (if-let ((url (map-nested-elt ref '("record" "$ref"))))
            (list (cons 'recid (when url (url-file-nondirectory url))) (cons 'label (map-nested-elt ref '("reference" "label"))))
@@ -549,8 +550,8 @@ determines the fields from the response. If absent they are deterimend using
            (if (or (and (map-contains-key reference "title") (map-contains-key reference "authors")) (not (map-contains-key ref "raw_refs")))
                (append (inspirehep-parse-entry reference) (list (cons 'label label)))
              (let* ((raw (map-nested-elt ref '("raw_refs" 0 "value") ""))
-                   (authorlist (seq-map  #'inspirehep--author-with-id (map-elt reference "authors")))
-                   (start-pos (when raw (1+ (string-search " " raw (string-search label raw))))))
+                    (authorlist (seq-map #'inspirehep--author-with-id (map-elt reference "authors")))
+                    (start-pos (when (and raw label) (1+ (string-search " " raw (string-search label raw))))))
                (list (cons 'reference (propertize (substring raw start-pos) 'inspirehep-metadata (list (cons 'authors authorlist)))) (cons 'label label)))))))
 
 (defun inspirehep-parse-single-record (json) "Parse JSON for single literature records from inpire."
