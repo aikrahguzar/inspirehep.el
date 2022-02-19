@@ -362,7 +362,6 @@ means that details overlay starts as invisible"
   "Print a (prepared) inspirehep record ITEM.
 Non-nil SAVED-P means that the entry is present in the target buffer.
 This is meant to show a single literature record and erases the buffer."
-  (erase-buffer) (delete-all-overlays)
   (inspirehep--with-text-property 'inspirehep-saved saved-p
      (inspirehep--with-text-property 'inspirehep-metadata item
       (let-alist item
@@ -402,16 +401,18 @@ This is meant to show a single literature record and erases the buffer."
 KEYS should be the list of keys present in the target buffer."
   (seq-do (lambda (item) (inspirehep-insert-result item (not (null (seq-intersection (map-elt item 'tex-keys) keys))))) items))
 
+(defun inspirehep--renew-buffer () "Setup buffer for a new page."
+  (erase-buffer) (delete-all-overlays) (setq inspirehep-bibtex-entries nil inspirehep--references-to-insert nil))
+
 (defun inspirehep-insert-results-new-query (num items keys)
   "Populate current buffer with ITEMS then display it.
 KEYS should be the list of keys present in the target buffer
 and NUM the total number of results."
-    (erase-buffer)
-    (delete-all-overlays)
-    (inspirehep--insert-header (concat (inspirehep--search-results-header) " (" (number-to-string num) " total results)"))
-    (inspirehep-insert-results items keys)
-    (inspirehep--selection-first)
-    (set-buffer-modified-p nil)
+  (inspirehep--renew-buffer)
+  (inspirehep--insert-header (concat (inspirehep--search-results-header) " (" (number-to-string num) " total results)"))
+  (inspirehep-insert-results items keys)
+  (inspirehep--selection-first)
+  (set-buffer-modified-p nil)
   (pop-to-buffer (current-buffer))
   (hl-line-highlight))
 
@@ -432,8 +433,7 @@ inserted at the time of callback."
          (when (equal url inspirehep--link-next)
            (pcase result-type
              ((or 'append-page 'append-all) (save-excursion (goto-char (point-max)) (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys))))
-             ((or 'new-page 'new-all) (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys))
-              (inspirehep--selection-first))
+             ((or 'new-page 'new-all) (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
              (_ (message "INSPIRE HEP: Invalid result type")))
            (setq inspirehep--link-next (nth 1 parsed-data))
            (when (or (eq result-type 'new-all) (eq result-type 'append-all))
@@ -448,12 +448,13 @@ inserted at the time of callback."
                 (inhibit-read-only t))
            (when refurls (inspirehep--lookup-url (car refurls) inspirehep--search-terms results-buffer 'single-record-references))
            (inspirehep-retrieve-bibtex results-buffer (nth 2 parsed-data))
-           (with-current-buffer results-buffer (inspirehep-detailed-record (car parsed-data)
-                                                                           (seq-contains-p (inspirehep-target-buffer-keys) (map-elt (car parsed-data) 'identifier)))
-                                (insert "\n\n")
-                                (inspirehep-with-fontification 'bold (insert "References:" "\n"))
-                                (setq inspirehep--references-to-insert (nth 1 parsed-data))
-                                (setq inspirehep--link-next refurls))))))
+           (with-current-buffer results-buffer
+             (inspirehep--renew-buffer)
+             (inspirehep-detailed-record (car parsed-data) (seq-contains-p (inspirehep-target-buffer-keys) (map-elt (car parsed-data) 'identifier)))
+             (insert "\n\n")
+             (inspirehep-with-fontification 'bold (insert "References:" "\n"))
+             (setq inspirehep--references-to-insert (nth 1 parsed-data))
+             (setq inspirehep--link-next refurls))))))
 
 (defun inspirehep--single-record-references-callback (results-buffer url)
   "Generate a callback for inserting references into RESULTS-BUFFER.
