@@ -77,6 +77,7 @@ are fectched one after another and inserted into the buffer as they arrive."
     (define-key map (kbd "r") #'inspirehep-lookup)
     (define-key map (kbd "c") #'inspirehep-search-citations)
     (define-key map (kbd "a") #'inspirehep-search-author)
+    (define-key map (kbd "e") #'inspirehep-view-entry)
     (define-key map (kbd "d") #'inspirehep-download-pdf)
     (define-key map (kbd "i") #'inspirehep-insert-bibtex)
     (define-key map (kbd "O") #'inspirehep-show-details-all)
