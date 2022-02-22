@@ -354,7 +354,7 @@ This is meant to show a single literature record and erases the buffer."
 (defun inspirehep--make-results-buffer ()
   "Make a new inspirehep-mode buffer."
   (let ((target-buffer (funcall inspirehep-target-buffer-function)))
-    (with-current-buffer (get-buffer-create "* INSPIRE HEP *")
+    (with-current-buffer (generate-new-buffer "* INSPIRE HEP *")
       (erase-buffer) (inspirehep-mode) (setq buffer-read-only t inspirehep--target-buffer target-buffer) (current-buffer))))
 
 (defun inspirehep-insert-results (items keys)
@@ -367,7 +367,7 @@ KEYS should be the list of keys present in the target buffer."
 KEYS should be the list of keys present in the target buffer
 and NUM the total number of results."
   (inspirehep--renew-buffer)
-  (inspirehep--insert-header (concat (car inspirehep--search-data) " (" (number-to-string num) " total results)"))
+  (inspirehep--insert-header (concat (nth 1 inspirehep--search-data) " (" (number-to-string num) " total results)"))
   (inspirehep-insert-results items keys)
   (inspirehep--selection-first)
   (pop-to-buffer (current-buffer))
@@ -411,16 +411,13 @@ in RESULTS-BUFFER."
                 (let ((parsed-data (progn (inspirehep-response-as-utf-8) (funcall parser)))
                       (inhibit-read-only t))
                   (with-current-buffer results-buffer
-                    (when (= hash (cdr inspirehep--search-data)) (funcall callback parsed-data)))))
+                    (when (= hash (nth 2 inspirehep--search-data)) (funcall callback parsed-data)))))
             (error (message "Error while processing request: %S" err)))
         (kill-buffer target-buffer)))))
 
-(defun inspirehep--search-callback (result-type)
-  "Generate a lambda to insert search-results.
-The lambda takes a single argument: the parsed data to insert. How it is
-inserted is determined by RESULT-TYPE."
-  (lambda (parsed-data)
-    (inspirehep--lookup-url (nth 0 parsed-data) (current-buffer) 'bibtex)
+(defun inspirehep--search-callback (parsed-data) "Insert search results using PARSED-DATA."
+  (let ((result-type (car inspirehep--search-data)))
+    (inspirehep--lookup-url (car parsed-data) (current-buffer) 'bibtex)
     (pcase result-type
       ((or 'append-page 'append-all) (save-excursion (goto-char (point-max)) (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys))))
       ((or 'new-page 'new-all) (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
@@ -466,14 +463,14 @@ bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
          (elapsed (if (< 14 len) (- current (car (last inspirehep--time-stamps))) 0)))
     (if (or (> 15 len) (< 6 elapsed))
         (with-current-buffer results-buffer
-          (when query (setq inspirehep--search-data (cons query (sxhash-equal (cons query current)))))
+          (if query (setq inspirehep--search-data (list result-type query (sxhash-equal (cons query current)))) (setcar inspirehep--search-data result-type))
           (cl-callf2 cons current inspirehep--time-stamps)
           (unless (> 15 len) (cl-callf butlast inspirehep--time-stamps))
           (let ((functions (pcase result-type ('single-record '(inspirehep--insert-single-record . inspirehep-parse-single-record))
                                               ('single-record-references '(inspirehep--insert-references . inspirehep-parse-search-results))
-                                              ('bibtex '(inspirehep-marge-bibtex . inspirehep-parse-bibtex))
-                                              (_ `(,(inspirehep--search-callback result-type) . inspirehep-parse-search-results)))))
-            (url-queue-retrieve url (inspirehep-generic-url-callback results-buffer (cdr functions) (cdr inspirehep--search-data) (car functions)) nil t)))
+                                              ('bibtex '(inspirehep-merge-bibtex . inspirehep-parse-bibtex))
+                                              (_ '(inspirehep--search-callback . inspirehep-parse-search-results)))))
+            (url-queue-retrieve url (inspirehep-generic-url-callback results-buffer (cdr functions) (nth 2 inspirehep--search-data) (car functions)) nil t)))
       (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url results-buffer result-type query))))
 
 ;;;; Dealing with JSON from inspirehep
@@ -548,7 +545,7 @@ determines the fields from the response. If absent they are deterimend using
        (seq-map (lambda (entry) (let ((beg (1+ (string-match "{" entry))) (end (string-match "," entry)))
                              (cons (substring-no-properties entry beg end) (concat "\n@" entry)))) (split-string (buffer-string) "@" t "\n")))
 
-(defun inspirehep-marge-bibtex (bibtex) "Add entries in BIBTEX to `inspirehep-bibtex-entries'." (cl-callf2 map-merge 'hash-table inspirehep-bibtex-entries bibtex))
+(defun inspirehep-merge-bibtex (bibtex) "Add entries in BIBTEX to `inspirehep-bibtex-entries'." (cl-callf2 map-merge 'hash-table inspirehep-bibtex-entries bibtex))
 
 ;;;; Downloading Files
 (defun inspirehep-download (url newname &optional count)
@@ -562,7 +559,7 @@ COUNT is used to keep track of retries. Download is aborted after 5 retries."
 (defun inspirehep--download (count url newname)
   "Helper for `inspirehep-download'. See it for COUNT URL and NEWNAME."
        (if (> count 5) (progn (message "Failed to download %s" url) (inspirehep--downlaod-next))
-         (url-queue-retrieve url #'inspirehep--download-callback (list count url newname))))
+         (url-queue-retrieve url #'inspirehep--download-callback (list count url newname) t)))
 
 (defun inspirehep--downlaod-next () "Download the next file in queue."
        (cl-callf butlast inspirehep--download-queue)
@@ -572,13 +569,13 @@ COUNT is used to keep track of retries. Download is aborted after 5 retries."
   "Callback for `inspirehep-download`.
 See it for COUNT URL and NEWNAME. STATUS is as in `url-retrieve'."
        (if-let ((errors (plist-get status :error)))
-           (progn (princ errors) (run-with-timer 2 nil #'inspirehep--download (1+ count) url newname))
+           (progn (princ errors) (run-with-timer 12 nil #'inspirehep--download (1+ count) url newname))
          (if-let ((handle (mm-dissect-buffer t))
                   ((equal (mm-handle-media-type handle) "application/pdf"))
                   (mm-attachment-file-modes (default-file-modes)))
              (progn (mm-save-part-to-file handle newname) (kill-buffer) (mm-destroy-parts handle))
-           (run-with-timer 12 nil #'inspirehep-download url newname (1+ count)))
-         (inspirehep--downlaod-next)))
+           (run-with-timer 12 nil #'inspirehep-download url newname (1+ count))))
+       (inspirehep--downlaod-next))
 
 ;;;; Interactive Commands
 ;;;;;; Search
@@ -595,7 +592,7 @@ If ALL-P is non-nil insert all results otherwise only the first page."
 If RESULT-TYPE is `append-page` or `append-all` insert them at the end of
 current buffer. Otherwise insert them after earsing the buffer. If RESULT-TYPE
 is `append-all` insert all pages one by one."
-  (interactive (list 'append-all))
+  (interactive (list 'append-page))
   (if-let (((eq major-mode #'inspirehep-mode)) (url inspirehep--link-next))
       (inspirehep--lookup-url url (current-buffer) result-type)
     (message "Already at the last page of current search")))
