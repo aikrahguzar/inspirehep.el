@@ -59,8 +59,6 @@ are fectched one after another and inserted into the buffer as they arrive."
   :group 'inspirehep)
 
 ;;;;;; defconst, defvar and defvar-local
-(defconst inspirehep--selection-mode-name-base "INSPIRE search results")
-
 (defvar inspirehep--download-queue nil "Store the files being downloaded.")
 
 (defvar inspirehep-mode-map
@@ -112,13 +110,13 @@ This variable is local to each search results buffer.")
 ;;;; Major mode
 (defun inspirehep--selection-mode-name ()
   "Compute a modeline string for `inspirehep-mode'."
-  (concat inspirehep--selection-mode-name-base
+  (concat "INSPIRE HEP"
           (if (bufferp inspirehep--target-buffer)
               (format " (→ %s)"
                       (buffer-name inspirehep--target-buffer))
             "")))
 
-(define-derived-mode inspirehep-mode fundamental-mode inspirehep--selection-mode-name-base
+(define-derived-mode inspirehep-mode fundamental-mode "INSPIRE HEP"
   "Browse inspirehepgraphic search results.
 \\{inspirehep-mode-map}"
   (hl-line-mode 1)
@@ -130,7 +128,6 @@ This variable is local to each search results buffer.")
   (setq-local revert-buffer-function #'inspirehep-revert-buffer))
 
 ;;;; Utilities
-
 (defun inspirehep--beginning-of-response-body ()
   "Move point to beginning of response body."
   (goto-char (point-min))
@@ -463,7 +460,7 @@ bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
          (elapsed (if (< 14 len) (- current (car (last inspirehep--time-stamps))) 0)))
     (if (or (> 15 len) (< 6 elapsed))
         (with-current-buffer results-buffer
-          (if query (setq inspirehep--search-data (list result-type query (sxhash-equal (cons query current)))) (setcar inspirehep--search-data result-type))
+          (when query (setq inspirehep--search-data (list result-type query (sxhash-equal (cons query current)))))
           (cl-callf2 cons current inspirehep--time-stamps)
           (unless (> 15 len) (cl-callf butlast inspirehep--time-stamps))
           (let ((functions (pcase result-type ('single-record '(inspirehep--insert-single-record . inspirehep-parse-single-record))
@@ -593,8 +590,9 @@ If RESULT-TYPE is `append-page` or `append-all` insert them at the end of
 current buffer. Otherwise insert them after earsing the buffer. If RESULT-TYPE
 is `append-all` insert all pages one by one."
   (interactive (list 'append-page))
-  (if-let (((eq major-mode #'inspirehep-mode)) (url inspirehep--link-next))
-      (inspirehep--lookup-url url (current-buffer) result-type)
+  (if (eq major-mode #'inspirehep-mode)
+      (progn (setcar inspirehep--search-data result-type)
+             (inspirehep--lookup-url inspirehep--link-next (current-buffer) result-type))
     (message "Already at the last page of current search")))
 
 (defun inspirehep-search-citations (all-p)
