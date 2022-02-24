@@ -590,7 +590,7 @@ If RESULT-TYPE is `append-page` or `append-all` insert them at the end of
 current buffer. Otherwise insert them after earsing the buffer. If RESULT-TYPE
 is `append-all` insert all pages one by one."
   (interactive (list 'append-page))
-  (if (eq major-mode #'inspirehep-mode)
+  (if inspirehep--link-next
       (progn (setcar inspirehep--search-data result-type)
              (inspirehep--lookup-url inspirehep--link-next (current-buffer) result-type))
     (message "Already at the last page of current search")))
@@ -598,7 +598,7 @@ is `append-all` insert all pages one by one."
 (defun inspirehep-search-citations (all-p)
   "Get the citations for the current selection.
 If ALL-P is non-nil insert all results otherwise only the first page."
-  (interactive (list (when inspirehep-insert-all 'all)))
+  (interactive (list (when inspirehep-insert-all t)))
        (inspirehep--lookup-url (inspirehep-lookup-at-point 'citations-url) (current-buffer) (if all-p 'new-all 'new-page)
                                (concat "Citations for " "“" (inspirehep-lookup-at-point 'title) "”")))
 
