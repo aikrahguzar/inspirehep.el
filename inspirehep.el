@@ -348,10 +348,11 @@ This is meant to show a single literature record and erases the buffer."
                                       (inspirehep-insert-result ref nil label t))))))))
 
 ;;;;;; Results buffer construction
-(defun inspirehep--make-results-buffer ()
-  "Make a new inspirehep-mode buffer."
+(defun inspirehep--make-results-buffer (&optional name)
+  "Make a new inspirehep-mode buffer.
+The buffer name is based on NAME if it is non-nill, otheriwse * INSPIRE HEP *."
   (let ((target-buffer (funcall inspirehep-target-buffer-function)))
-    (with-current-buffer (generate-new-buffer "* INSPIRE HEP *")
+    (with-current-buffer (generate-new-buffer (or name "* INSPIRE HEP *"))
       (erase-buffer) (inspirehep-mode) (setq buffer-read-only t inspirehep--target-buffer target-buffer) (current-buffer))))
 
 (defun inspirehep-insert-results (items keys)
@@ -371,7 +372,7 @@ and NUM the total number of results."
   (hl-line-highlight))
 
 (defun inspirehep--renew-buffer () "Setup buffer for a new page."
-  (erase-buffer) (delete-all-overlays)
+  (erase-buffer) (delete-all-overlays) (pop-to-buffer (current-buffer))
   (setq inspirehep-bibtex-entries nil inspirehep--references-to-insert nil))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
