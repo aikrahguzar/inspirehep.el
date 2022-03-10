@@ -196,12 +196,13 @@ Set the invisible property of the overlay to INVISIBLE."
        (seq-find (lambda (ov) (overlay-get ov 'details)) (overlays-at (1- (cdr (get-text-property (point) 'inspirehep-entry-bounds))))))
 
 ;;;; Interaction
-(defun inspirehep--selection-move (move-fn search-fn)
-  "Move using MOVE-FN, then call SEARCH-FN and go to first match."
+(defun inspirehep--selection-move (move-fn search-fn &optional regex)
+  "Move using MOVE-FN, then call SEARCH-FN and go to first match.
+If non-nil REGEX is passed to the SEARCH-FN."
   (let ((target nil))
     (save-excursion
       (funcall move-fn)
-      (when (funcall search-fn (concat "^\\(?:" (regexp-quote inspirehep-search-result-marker) "\\|\\[[[:alnum:]]*]\\)") nil t)
+      (when (funcall search-fn (or regex (concat "^\\(?:" (regexp-quote inspirehep-search-result-marker) "\\|\\[[[:alnum:]]*]\\)")) nil t)
         (setq target (match-end 0))))
     (prog1 target (when target (goto-char target)
                         (if-let ((entry-end (cdr (get-text-property target 'inspirehep-entry-bounds)))
@@ -372,7 +373,7 @@ and NUM the total number of results."
   (hl-line-highlight))
 
 (defun inspirehep--renew-buffer () "Setup buffer for a new page."
-  (erase-buffer) (delete-all-overlays) (pop-to-buffer (current-buffer))
+  (erase-buffer) (delete-all-overlays)
   (setq inspirehep-bibtex-entries nil inspirehep--references-to-insert nil))
 
 (defun inspirehep-re-insert-entry-at-point (keys) "Insert the entry at point again comparing against KEYS."
@@ -415,7 +416,7 @@ in RESULTS-BUFFER."
 
 (defun inspirehep--search-callback (parsed-data) "Insert search results using PARSED-DATA."
   (let ((result-type (car inspirehep--search-data)))
-    (inspirehep--lookup-url (car parsed-data) (current-buffer) 'bibtex)
+    (inspirehep--lookup-url (car parsed-data) 'bibtex nil (current-buffer))
     (pcase result-type
       ((or 'append-page 'append-all) (save-excursion (goto-char (point-max)) (inspirehep-insert-results (nth 3 parsed-data) (inspirehep-target-buffer-keys))))
       ((or 'new-page 'new-all) (inspirehep-insert-results-new-query (nth 2 parsed-data) (nth 3 parsed-data) (inspirehep-target-buffer-keys)))
@@ -428,8 +429,8 @@ in RESULTS-BUFFER."
   "Inserted the single literature record in PARSED-DATA."
   (let* ((recids (seq-filter #'identity (seq-map (lambda (ref) (map-elt ref 'recid)) (nth 1 parsed-data))))
          (refurls (seq-map (lambda (ids) (inspirehep-query-url (concat "recid:(" (string-join ids " or ") ")") 25)) (seq-partition recids 25))))
-    (when refurls (inspirehep--lookup-url (car refurls) (current-buffer) 'single-record-references))
-    (inspirehep--lookup-url (nth 2 parsed-data) (current-buffer) 'bibtex)
+    (when refurls (inspirehep--lookup-url (car refurls) 'single-record-references nil (current-buffer)))
+    (inspirehep--lookup-url (nth 2 parsed-data) 'bibtex nil (current-buffer))
     (inspirehep--renew-buffer)
     (inspirehep-detailed-record (car parsed-data) (seq-contains-p (inspirehep-target-buffer-keys) (map-elt (car parsed-data) 'identifier)))
     (insert "\n\n")
@@ -440,8 +441,8 @@ in RESULTS-BUFFER."
 (defun inspirehep--insert-references (parsed-data)
   "Insert references in PARSED-DATA."
   (cl-callf cdr inspirehep--link-next)
-  (when inspirehep--link-next (inspirehep--lookup-url (car inspirehep--link-next) (current-buffer) 'single-record-references))
-  (inspirehep--lookup-url (car parsed-data) (current-buffer) 'bibtex)
+  (when inspirehep--link-next (inspirehep--lookup-url (car inspirehep--link-next) 'single-record-references nil (current-buffer)))
+  (inspirehep--lookup-url (car parsed-data) 'bibtex nil (current-buffer))
   (save-excursion (let ((keys (inspirehep-target-buffer-keys))
                         (continue t))
                     (goto-char (point-max))
@@ -452,13 +453,15 @@ in RESULTS-BUFFER."
   (unless inspirehep--link-next (set-buffer-modified-p nil) (message "Done inserting the record.")))
 
 ;;;; Searching
-(defun inspirehep--lookup-url (url results-buffer result-type &optional query)
+(defun inspirehep--lookup-url (url result-type &optional query results-buffer)
   "Display results from URL.
 QUERY is used to construct the header. The RESULTS-BUFFER determines where
 bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
   (let* ((current (time-convert (current-time) 'integer))
          (len (length inspirehep--time-stamps))
-         (elapsed (if (< 14 len) (- current (car (last inspirehep--time-stamps))) 0)))
+         (elapsed (if (< 14 len) (- current (car (last inspirehep--time-stamps))) 0))
+         (results-buffer (or results-buffer (when (and (eq major-mode #'inspirehep-mode) (string-match-p "^\\* INSPIRE HEP \\*" (buffer-name))) (current-buffer))
+                             (inspirehep--make-results-buffer))))
     (if (or (> 15 len) (< 6 elapsed))
         (with-current-buffer results-buffer
           (when query (setq inspirehep--search-data (list result-type query (sxhash-equal (cons query current)))))
@@ -469,7 +472,7 @@ bibtex entries are inserted. RESULT-TYPE determines how the results are shown."
                                               ('bibtex '(inspirehep-merge-bibtex . inspirehep-parse-bibtex))
                                               (_ '(inspirehep--search-callback . inspirehep-parse-search-results)))))
             (url-queue-retrieve url (inspirehep-generic-url-callback results-buffer (cdr functions) (nth 2 inspirehep--search-data) (car functions)) nil t)))
-      (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url results-buffer result-type query))))
+      (run-with-timer (- 6 elapsed) nil #'inspirehep--lookup-url url result-type query results-buffer))))
 
 ;;;; Dealing with JSON from inspirehep
 (defun inspirehep--search-parameters (&optional size sort fields) "See `inspirehep-query-url' for SIZE, SORT and FIELDS."
@@ -508,7 +511,9 @@ determines the fields from the response. If absent they are deterimend using
                (cons 'recid (gethash "id" entry))
                (cons 'arxiv-url (when arxiv-id (concat "https://arxiv.org/abs/" arxiv-id)))
                (cons 'direct-url (if arxiv-id (concat "https://export.arxiv.org/pdf/" arxiv-id) (map-nested-elt metadata '("documents" 0 "url"))))
-               (cons 'citations-url (inspirehep-map-apply entry '("links" "citations") #'concat (inspirehep--search-parameters)))
+               (cons 'citations-url (or (inspirehep-map-apply entry '("links" "citations") #'concat (inspirehep--search-parameters))
+                                        (inspirehep-map-apply metadata '("control_number")
+                                                              (lambda (recid) (inspirehep-query-url (concat "refersto:recid:" (number-to-string recid)))))))
                (cons 'abstract  (map-elt (let ((as (map-elt metadata "abstracts"))) (map-elt as (1- (length as)))) "value"))
                (cons 'filename (string-replace "\\" "" (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
 
@@ -582,8 +587,7 @@ See it for COUNT URL and NEWNAME. STATUS is as in `url-retrieve'."
   "Perform a search for QUERY.
 If ALL-P is non-nil insert all results otherwise only the first page."
   (interactive (list (read-string "InspireHEP: " nil 'inspirehep--search-history) inspirehep-insert-all))
-  (inspirehep--lookup-url (inspirehep-query-url query) (if (eq major-mode #'inspirehep-mode) (current-buffer) (inspirehep--make-results-buffer))
-                          (if all-p 'new-all 'new-page) (concat "INSPIRE HEP search results for " "“" query "”")))
+  (inspirehep--lookup-url (inspirehep-query-url query) (if all-p 'new-all 'new-page) (concat "INSPIRE HEP search results for " "“" query "”")))
 
 (defun inspirehep-next-page (result-type)
   "Insert the next page of search results for the current query.
@@ -593,14 +597,14 @@ is `append-all` insert all pages one by one."
   (interactive (list 'append-page))
   (if inspirehep--link-next
       (progn (setcar inspirehep--search-data result-type)
-             (inspirehep--lookup-url inspirehep--link-next (current-buffer) result-type))
+             (inspirehep--lookup-url inspirehep--link-next result-type nil (current-buffer)))
     (message "Already at the last page of current search")))
 
 (defun inspirehep-search-citations (all-p)
   "Get the citations for the current selection.
 If ALL-P is non-nil insert all results otherwise only the first page."
   (interactive (list (when inspirehep-insert-all t)))
-       (inspirehep--lookup-url (inspirehep-lookup-at-point 'citations-url) (current-buffer) (if all-p 'new-all 'new-page)
+       (inspirehep--lookup-url (inspirehep-lookup-at-point 'citations-url) (if all-p 'new-all 'new-page)
                                (concat "Citations for " "“" (inspirehep-lookup-at-point 'title) "”")))
 
 (defun inspirehep-search-author (all-p)
@@ -612,11 +616,11 @@ If ALL-P is non-nil insert all results otherwise only the first page."
                  (let* ((candidates  (inspirehep-lookup-at-point 'authors))
                         (candidate (if (cdr candidates) (completing-read "Select an Author: " candidates  nil t) (car candidates))))
                    (get-text-property 0 'inspirehep-author-id (car (member candidate candidates)))))))
-    (inspirehep--lookup-url (inspirehep-query-url (concat "a " auth)) (current-buffer) (if all-p 'new-all 'new-page)
+    (inspirehep--lookup-url (inspirehep-query-url (concat "a " auth)) (if all-p 'new-all 'new-page)
                             (concat "Articles by " "“" auth "”"))))
 
 (defun inspirehep-view-entry (recid) "View the details of the literature record with id RECID." (interactive (list (inspirehep-lookup-at-point 'recid)))
-       (inspirehep--lookup-url (concat "https://inspirehep.net/api/literature/" recid) (current-buffer) 'single-record (concat "recid:" recid)))
+       (inspirehep--lookup-url (concat "https://inspirehep.net/api/literature/" recid) 'single-record (concat "recid:" recid)))
 
 ;;;;;; Bibtex and PDF
 (defun inspirehep-insert-bibtex (key) "Insert the bibtex corresponding to KEY in the target buffer unless SAVED ."
@@ -658,6 +662,11 @@ The file is stored as NAME in the directory `inspirehep-download-directory'"
 (defun inspirehep--selection-previous () "Move to previous search result." (interactive)
   (or (inspirehep--selection-move #'beginning-of-line #'re-search-backward) (goto-char (point-min))))
 
+(defun inspirehep-jump-to-reference (ref) "Jump to reference REF."
+       (interactive (list (pcase current-prefix-arg
+                            ((pred numberp) (number-to-string current-prefix-arg))
+                            (_ (read-string "Jump to reference:")))))
+       (inspirehep--selection-move #'beginning-of-buffer #'re-search-forward (concat "^\\[" ref "\\]")))
 ;;;;;; Hiding and showing details
 (defun inspirehep-toggle-details (ov) "Toggle the visibility of details overlay OV for current entry." (interactive (list (inspirehep-details-overlay)))
        (overlay-put ov 'invisible (not (overlay-get ov 'invisible))))
