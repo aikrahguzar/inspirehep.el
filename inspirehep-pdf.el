@@ -133,11 +133,6 @@ The call is interactive if IS-INTERACTIVE is non-nill."
 (defun inspirehep-pdf-select-target-buffer () "Select the buffer to insert bibtex entries in." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-select-target-buffer))
 
-;;;;Misc
-(defun inspirehep-pdf-toggle-details () "Toggle details for the selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-toggle-details))
-
-(provide 'inspirehep-pdf)
 ;;;;;; Search
 (defun inspirehep-pdf-search-author () "Search an author of the selected entry." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-search-author))
@@ -148,4 +143,9 @@ The call is interactive if IS-INTERACTIVE is non-nill."
 (defun inspirehep-pdf-view-entry () "View detailed record for the selected entry." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-view-entry))
 
+;;;;Misc
+(defun inspirehep-pdf-toggle-details () "Toggle details for the selected entry." (interactive)
+       (inspirehep-pdf--with-record-buffer t #'inspirehep-toggle-details))
+
+(provide 'inspirehep-pdf)
 ;;; inspirehep-pdf.el ends here
