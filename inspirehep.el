@@ -70,13 +70,15 @@ are fectched one after another and inserted into the buffer as they arrive."
     (define-key map (kbd "RET") #'inspirehep--selection-browse)
     (define-key map (kbd "<C-return>") #'inspirehep--selection-browse-direct)
     (define-key map (kbd "C-RET") #'inspirehep--selection-browse-direct)
+    (define-key map (kbd "r") #'inspirehep-jump-to-reference)
     (define-key map (kbd "b") #'inspirehep-select-target-buffer)
     (define-key map (kbd "q") #'quit-window)
-    (define-key map (kbd "r") #'inspirehep-lookup)
+    (define-key map (kbd "f") #'inspirehep-lookup)
     (define-key map (kbd "c") #'inspirehep-search-citations)
     (define-key map (kbd "a") #'inspirehep-search-author)
     (define-key map (kbd "e") #'inspirehep-view-entry)
     (define-key map (kbd "d") #'inspirehep-download-pdf)
+    (define-key map (kbd "s") #'inspirehep-insert-and-download)
     (define-key map (kbd "i") #'inspirehep-insert-bibtex)
     (define-key map (kbd "O") #'inspirehep-show-details-all)
     (define-key map (kbd "H") #'inspirehep-hide-details-all)
@@ -193,7 +195,12 @@ Set the invisible property of the overlay to INVISIBLE."
          (overlay-put ,ov-var 'details t) (overlay-put ,ov-var 'invisible ,invisible) ,ov-var))))
 
 (defun inspirehep-details-overlay () "Return the details overlay of the entry at point."
-       (seq-find (lambda (ov) (overlay-get ov 'details)) (overlays-at (1- (cdr (get-text-property (point) 'inspirehep-entry-bounds))))))
+       (seq-find (lambda (ov) (overlay-get ov 'details)) (when-let ((pt (cdr (get-text-property (point) 'inspirehep-entry-bounds)))) (overlays-at (1- pt)))))
+
+(defun inspirehep-select-bib-file () "Select a bib file."
+       (let ((filename (expand-file-name (read-file-name "Choose a bib file:" nil nil nil nil
+                                                         (lambda (file) (or (equal "bib" (file-name-extension file)) (directory-name-p file)))))))
+         (if (equal "bib" (file-name-extension filename)) filename (error "Choosen file %s is not a bib file" filename))))
 
 ;;;; Interaction
 (defun inspirehep--selection-move (move-fn search-fn &optional regex)
@@ -667,22 +674,36 @@ The file is stored as NAME in the directory `inspirehep-download-directory'"
                             ((pred numberp) (number-to-string current-prefix-arg))
                             (_ (read-string "Jump to reference:")))))
        (inspirehep--selection-move #'beginning-of-buffer #'re-search-forward (concat "^\\[" ref "\\]")))
+
 ;;;;;; Hiding and showing details
-(defun inspirehep-toggle-details (ov) "Toggle the visibility of details overlay OV for current entry." (interactive (list (inspirehep-details-overlay)))
-       (overlay-put ov 'invisible (not (overlay-get ov 'invisible))))
+(defun inspirehep-toggle-details (ov &optional val)
+  "Toggle visibility of overlay OV for current entry when called interactively.
+Otherwise set visibility property to VAL."
+  (interactive (let* ((ov-arg (inspirehep-details-overlay))
+                      (val-arg (when ov-arg (not (overlay-get ov-arg 'invisible)))))
+                 (list ov-arg val-arg)))
+               (when ov (overlay-put ov 'invisible val)))
 
 (defun inspirehep-hide-details-all () "Hide the details for all entries." (interactive)
-       (seq-do (lambda (ov) (when (overlay-get ov 'details) (overlay-put ov 'invisible t))) (overlays-in (point-min) (point-max))))
+       (seq-do (lambda (ov) (inspirehep-toggle-details ov t)) (overlays-in (point-min) (point-max))))
 
 (defun inspirehep-show-details-all () "Show the details for all entries." (interactive)
-       (seq-do (lambda (ov) (when (overlay-get ov 'details) (overlay-put ov 'invisible nil))) (overlays-in (point-min) (point-max))))
+       (seq-do (lambda (ov) (inspirehep-toggle-details ov nil)) (overlays-in (point-min) (point-max))))
+
+(defun inspirehep-hide-jump-show (ref &optional top-p)
+  "Hide details for the current entry, jump to REF and show details.
+If TOP-P is non-nil, make the current line the top line."
+  (interactive) (inspirehep-toggle-details (inspirehep-details-overlay) t)
+  (if (inspirehep-jump-to-reference ref) (progn (hl-line-highlight) (inspirehep-toggle-details (inspirehep-details-overlay) nil) (when top-p (recenter 0)))
+    (message "Reference %s not found." ref)))
 
 ;;;;;; Miscellaneous
 (defun inspirehep-select-target-buffer (buffer-name)
   "Change buffer in which BibTeX results will be inserted.
 BUFFER-NAME is the name of the new target buffer."
-  (interactive (list (read-buffer "Buffer to insert entries into: " nil t
-                                  (lambda (b) (eq 'bibtex-mode (buffer-local-value 'major-mode (get-buffer (if (stringp b) b (car b)))))))))
+  (interactive (list (cond (current-prefix-arg (find-file-noselect (inspirehep-select-bib-file)))
+                           (t (read-buffer "Buffer to insert entries into: " nil t
+                                           (lambda (b) (eq 'bibtex-mode (buffer-local-value 'major-mode (get-buffer (if (stringp b) b (car b)))))))))))
   (let ((buffer (get-buffer buffer-name)))
     (if (buffer-local-value 'buffer-read-only buffer)
         (user-error "%s is read-only" (buffer-name buffer))
