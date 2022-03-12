@@ -34,6 +34,8 @@
     map)
   "A keymap for commands that act on the inspirehep record from a pdf buffer.")
 
+(defvar-local inspirehep-pdf--references-cache 'uninitialized)
+
 ;;;; Minor mode
 ;;;###autoload
 (define-minor-mode inspirehep-pdf-record-mode "Minor mode for viewing the INSPIRE record of an article alongside its pdf."
@@ -59,19 +61,42 @@
          (kill-buffer buf-name)))
 
 ;;;; Utilities
-(defun inspirehep-pdf-parse-ref (str) "Parse STR into a list of references."
-       (cond ((string-match-p "," str) (seq-mapcat #'inspirehep-pdf-parse-ref (split-string str "," t (rx space))))
+(defun inspirehep-pdf--parse-ref (str) "Parse STR into a list of references."
+       (cond ((string-match-p "," str) (seq-mapcat #'inspirehep-pdf--parse-ref (split-string str "," t (rx space))))
              ((string-match-p "[–—-]" str) (let ((numlist (seq-map #'string-to-number (split-string str "[–—-]"))))
                                              (seq-map #'number-to-string (number-sequence (car numlist) (cadr numlist)))))
              (t (list str))))
 
-(defun inspirehep-pdf-refs-on-page (page) "Find the references on the PAGE of the pdf."
+(defun inspirehep-pdf--refs-on-page (page) "Find the references on the PAGE of the pdf."
        (let ((page-text (pdf-info-gettext page '(0 0 1 1)))
              (beg-pos 1) (refs))
-         (while (string-match (rx ?\[ (0+ (or alnum ?- ?– ?— ?, space)) ?\]) page-text beg-pos)
+         (while (string-match (rx space ?\[ (0+ (or alnum ?- ?– ?— ?, space)) ?\]) page-text beg-pos)
            (setq beg-pos (match-end 0))
-           (cl-callf2 seq-concatenate 'list refs (inspirehep-pdf-parse-ref (substring (match-string 0 page-text) 1 -1))))
+           (cl-callf2 seq-concatenate 'list refs (inspirehep-pdf--parse-ref (string-trim (match-string 0 page-text) (rx (0+ space) ?\[) (rx (0+ space) ?\])))))
          refs))
+
+(defun inspirehep-pdf--find-references () "Return the list of the references with annotation."
+       (let ((this-page (pdf-info-number-of-pages))
+             (refs nil))
+         (while this-page (cl-callf2 map-merge 'hash-table refs (inspirehep-pdf--format-refs-on-page this-page))
+                (setq this-page (unless (or (pdf-info-search-regexp "^[[:space:]]*References[[:space:]]*$" this-page) (= this-page 1)) (1- this-page))))
+         (setq inspirehep-pdf--references-cache refs)))
+;; (rxt-elisp-to-pcre (rx line-start (0+ space) "References" (0+ space) line-end))
+
+(defun inspirehep-pdf--format-refs-on-page (page) "Format the references on the PAGE for disaply in `completing-read'."
+       (let ((refs (pdf-info-search-regexp "^[[:space:]]*\\[[[:alnum:]]+\\][[:space:]]+.*$" page)))
+         (seq-map (lambda (res) (let* ((text (substring-no-properties (map-elt res 'text)))
+                                  (ann (progn (string-match (rx (0+ space) ?\[ (0+ alnum) ?\]) text) (substring text (match-end 0))))
+                                  (key (string-trim (match-string 0 text) (rx (0+ space) ?\[) (rx (0+ space) ?\]))))
+                             (cons key (concat (propertize (truncate-string-to-width key 16 nil ?\s) 'face 'bold)
+                                               (propertize (string-trim ann) 'face 'font-lock-comment-face)))))
+                  refs)))
+;; (rxt-elisp-to-pcre (rx line-start (0+ space) ?\[ (1+ alnum) ?\] (0+ not-newline) line-end))
+
+(defun inspirehep-pdf--select-ref (refs) "Select a reference among REFS using completing read."
+       (when (eq inspirehep-pdf--references-cache 'uninitialized) (inspirehep-pdf--find-references))
+         (car (split-string (completing-read "Select a reference: "
+                                             (seq-map (lambda (cand) (gethash cand inspirehep-pdf--references-cache (propertize cand 'face 'bold))) refs)))))
 
 ;;;; Searching from a PDFView buffer
 ;;;###autoload
@@ -117,7 +142,7 @@ The call is interactive if IS-INTERACTIVE is non-nill."
        (interactive (list (pcase current-prefix-arg
                             (0 (string-join (pdf-view-active-region-text)))
                             ((pred numberp) (number-to-string current-prefix-arg))
-                            (_ (completing-read "Jump to reference: " (inspirehep-pdf-refs-on-page (pdf-view-current-page)))))))
+                            (_ (inspirehep-pdf--select-ref (inspirehep-pdf--refs-on-page (pdf-view-current-page)))))))
        (inspirehep-pdf--with-record-buffer nil #'inspirehep-hide-jump-show ref t))
 
 ;;;;;; Bibtex and download
