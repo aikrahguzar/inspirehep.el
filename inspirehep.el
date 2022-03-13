@@ -1,5 +1,7 @@
 ;;; inspirehep.el --- Emacs frontend for INSPIRE HEP -*- lexical-binding: t; -*-
-;;
+
+;; Copyright (C) 2016  Clément Pit-Claudel
+
 ;; Created: January 18, 2022
 ;; Modified: January 18, 2022
 ;; Version: 0.0.1
@@ -10,7 +12,6 @@
 ;; This file is not part of GNU Emacs.
 ;;
 
-;; Copyright (C) 2016  Clément Pit-Claudel
 
 ;;; Commentary:
 ;;Use the JSON api provided by inspirehep to integrate it with inspirehep.el
