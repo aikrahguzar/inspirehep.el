@@ -19,7 +19,7 @@
 (require 'pdf-links)
 
 ;;;; Variables
-(defvar inspirehep-pdf--popup-windows nil)
+(defvar inspirehep-pdf--window-pair nil)
 
 (defvar inspirehep-pdf-manipulate-record-map
   (let ((map (make-sparse-keymap)))
@@ -36,23 +36,24 @@
 
 (defvar-local inspirehep-pdf--references-cache 'uninitialized)
 
+(defvar-local inspirehep-pdf-record-buffer 'uninitialized)
 ;;;; Minor mode
 ;;;###autoload
 (define-minor-mode inspirehep-pdf-record-mode "Minor mode for viewing the INSPIRE record of an article alongside its pdf."
   :global t :lighter "PDF with INSPIRE record" :group 'inspirehep
   (if (not inspirehep-pdf-record-mode) (progn (remove-hook 'window-buffer-change-functions #'inspirehep-pdf-show-record)
                                               (remove-hook 'kill-buffer-hook #'inspirehep-pdf--kill-record)
-                                              (when (window-live-p (cdr inspirehep-pdf--popup-windows)) (delete-window (cdr inspirehep-pdf--popup-windows))))
+                                              (when (window-live-p (cdr inspirehep-pdf--window-pair)) (delete-window (cdr inspirehep-pdf--window-pair))))
     (inspirehep-pdf-show-record) (add-hook 'window-buffer-change-functions #'inspirehep-pdf-show-record)
     (add-hook 'kill-buffer-hook #'inspirehep-pdf--kill-record)))
 
 (defun inspirehep-pdf-show-record (&rest _) "Show the correct record in the popup window."
        (if-let (((eq major-mode #'pdf-view-mode))
                 (buf-name (inspirehep-pdf-get-record)))
-           (progn (setq inspirehep-pdf--popup-windows (cons (selected-window) (get-buffer-window buf-name)))
-                  (pdf-view-redisplay (car inspirehep-pdf--popup-windows)))
-         (when (and (equal (selected-window) (car inspirehep-pdf--popup-windows)) (window-live-p (cdr inspirehep-pdf--popup-windows)))
-           (delete-window (cdr inspirehep-pdf--popup-windows)))))
+           (progn (setq inspirehep-pdf--window-pair (cons (selected-window) (get-buffer-window buf-name)))
+                  (pdf-view-redisplay (car inspirehep-pdf--window-pair)))
+         (when (and (equal (selected-window) (car inspirehep-pdf--window-pair)) (window-live-p (cdr inspirehep-pdf--window-pair)))
+           (delete-window (cdr inspirehep-pdf--window-pair)))))
 
 (defun inspirehep-pdf--kill-record () "Kill the buffer showing inspirehep record for PDF."
        (when-let (((eq major-mode #'pdf-view-mode))
@@ -121,22 +122,25 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
 
 ;;;###autoload
 (defun inspirehep-pdf-get-record () "Get the inspire record using the arxiv id on the first page." (interactive)
-       (if-let ((buf-name (concat "* INSPIREHEP PDF *" (buffer-name)))
-                (buffer (get-buffer buf-name)))
-           (progn (display-buffer buf-name) buf-name)
-         (if-let ((str (map-elt (car (pdf-info-search-string "arXiv" 1)) 'text))
-                  (beg (+ 6 (string-match "arXiv" str)))
-                  (id (substring-no-properties str beg (string-match "v" str beg)))
-                  (url (concat "https://inspirehep.net/api/arxiv/" id)))
-             (progn (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) (inspirehep--make-results-buffer buf-name))
-                    (display-buffer buf-name) buf-name)
-           (message "No arxiv id found for the current PDF.") nil)))
+       (when inspirehep-pdf-record-buffer
+         (when (eq 'uninitialized inspirehep-pdf-record-buffer) (setq inspirehep-pdf-record-buffer (concat "* INSPIREHEP PDF *" (buffer-name))))
+         (if-let ((buf-name inspirehep-pdf-record-buffer)
+                  (buffer (get-buffer buf-name)))
+             (progn (display-buffer buf-name) buf-name)
+           (if-let ((str (map-elt (car (pdf-info-search-string "arXiv" 1)) 'text))
+                    (beg (+ 6 (string-match "arXiv" str)))
+                    (id (substring-no-properties str beg (string-match "v" str beg)))
+                    (url (concat "https://inspirehep.net/api/arxiv/" id)))
+               (progn (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) (inspirehep--make-results-buffer buf-name))
+                      (display-buffer buf-name) buf-name)
+             (message "No arxiv id found for the current PDF.")
+             (setq inspirehep-pdf-record-buffer nil)))))
 
 ;;;; Acting on the buffer showing the record
 (defun inspirehep-pdf--with-record-buffer (is-interactive func &rest args)
   "Call FUNC with ARGS on the buffer showing inspire record.
 The call is interactive if IS-INTERACTIVE is non-nill."
-  (with-selected-window (cdr inspirehep-pdf--popup-windows) (if is-interactive (call-interactively func) (apply func args))))
+  (with-selected-window (cdr inspirehep-pdf--window-pair) (if is-interactive (call-interactively func) (apply func args))))
 
 (defun inspirehep-pdf-jump-to-reference (ref) "Jump to reference REF in the record buffer."
        (interactive (list (pcase current-prefix-arg

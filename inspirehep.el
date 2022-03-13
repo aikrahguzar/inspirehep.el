@@ -9,9 +9,11 @@
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
+
+;; Copyright (C) 2016  Clément Pit-Claudel
+
 ;;; Commentary:
 ;;Use the JSON api provided by inspirehep to integrate it with inspirehep.el
-;;
 ;;
 ;;; Code:
 
@@ -200,7 +202,7 @@ Set the invisible property of the overlay to INVISIBLE."
 (defun inspirehep-select-bib-file () "Select a bib file."
        (let ((filename (expand-file-name (read-file-name "Choose a bib file:" nil nil nil nil
                                                          (lambda (file) (or (equal "bib" (file-name-extension file)) (directory-name-p file)))))))
-         (if (equal "bib" (file-name-extension filename)) filename (error "Choosen file %s is not a bib file" filename))))
+         (if (equal "bib" (file-name-extension filename)) filename (user-error "Choosen file %s is not a bib file" filename))))
 
 ;;;; Interaction
 (defun inspirehep--selection-move (move-fn search-fn &optional regex)
@@ -710,13 +712,14 @@ BUFFER-NAME is the name of the new target buffer."
       (setq inspirehep--target-buffer buffer)
       (revert-buffer))))
 
-(defun inspirehep-kill-buffers ()
-  "Kill all `inspirehep-mode' buffers."
+(defun inspirehep-kill-buffers (&optional all-p)
+  "Kill all `inspirehep-mode' buffers using default naming scheme.
+When ALL-P is non-nill kill all `inspirehep-mode' buffers."
   (interactive)
   (dolist (buf (buffer-list))
     (when (and (buffer-live-p buf)
-               (eq (buffer-local-value 'major-mode buf)
-                   'inspirehep-mode))
+               (eq (buffer-local-value 'major-mode buf) 'inspirehep-mode)
+               (or all-p (string-match-p "* INSPIRE HEP *" (buffer-name buf))))
       (kill-buffer buf))))
 
 (provide 'inspirehep)
