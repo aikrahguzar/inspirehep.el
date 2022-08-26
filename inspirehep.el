@@ -526,7 +526,8 @@ determines the fields from the response. If absent they are deterimend using
                                         (inspirehep-map-apply metadata '("control_number")
                                                               (lambda (recid) (inspirehep-query-url (concat "refersto:recid:" (number-to-string recid)))))))
                (cons 'abstract  (map-elt (let ((as (map-elt metadata "abstracts"))) (map-elt as (1- (length as)))) "value"))
-               (cons 'filename (string-replace "\\" "" (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
+               (cons 'filename (replace-regexp-in-string (rx (or "\\" "/")) ""
+                                                         (concat auths-last " - " (substring title 0 (min 70 (length title))) " - " id-end ".pdf"))))))
 
 (defun inspirehep-parse-reference (ref) "Parse the reference REF."
        (if-let ((url (map-nested-elt ref '("record" "$ref"))))
