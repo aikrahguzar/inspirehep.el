@@ -7,7 +7,7 @@
 ;; Version: 0.0.1
 ;; Keywords: bib
 ;; Url: https://github.com/aikrahguzar/inspirehep.el
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "28.1"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
@@ -417,8 +417,9 @@ in RESULTS-BUFFER."
                   (inspirehep--throw-on-unexpected-errors errors)
                 (inspirehep--beginning-of-response-body)
                 (delete-region (point-min) (point))
-                (let ((parsed-data (progn (inspirehep-response-as-utf-8) (funcall parser)))
-                      (inhibit-read-only t))
+                (when-let ((buffer-live-p results-buffer)
+                           (parsed-data (progn (inspirehep-response-as-utf-8) (funcall parser)))
+                           (inhibit-read-only t))
                   (with-current-buffer results-buffer
                     (when (= hash (nth 2 inspirehep--search-data)) (funcall callback parsed-data)))))
             (inspirehep--url-error (message "Error while processing request: %S" err) (with-current-buffer results-buffer (setq inspirehep--link-next nil))))
