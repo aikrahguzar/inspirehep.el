@@ -101,7 +101,7 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
                 (id (substring-no-properties str beg (string-match "v" str beg)))
                 (url (concat "https://inspirehep.net/api/arxiv/" id))
                 (buf (get-buffer-create (concat "* INSPIREHEP PDF *" (buffer-name)))))
-           (progn (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) buf) buf)
+           (progn (with-current-buffer buf (inspirehep-mode)) (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) buf) buf)
          (message "No arxiv id found for the current PDF.") nil))
 
 ;;;###autoload

@@ -123,8 +123,7 @@ This variable is local to each search results buffer.")
             "")))
 
 (define-derived-mode inspirehep-mode fundamental-mode "INSPIRE HEP"
-  "Browse inspirehepgraphic search results.
-\\{inspirehep-mode-map}"
+  "Browse inspirehepgraphic search results."
   (hl-line-mode 1)
   (visual-line-mode)
   (setq-local truncate-lines nil)
