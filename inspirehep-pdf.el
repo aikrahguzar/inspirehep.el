@@ -112,7 +112,7 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
 (defun inspirehep-pdf--with-record-buffer (is-interactive func &rest args)
   "Call FUNC with ARGS on the buffer showing inspire record.
 The call is interactive if IS-INTERACTIVE is non-nill."
-  (with-selected-window (companion-mode-companion-window) (if is-interactive (call-interactively func) (apply func args))))
+  (companion-mode-with-companion (if is-interactive (call-interactively func) (apply func args))))
 
 (defun inspirehep-pdf-jump-to-reference (ref) "Jump to reference REF in the record buffer."
        (interactive (list (pcase current-prefix-arg

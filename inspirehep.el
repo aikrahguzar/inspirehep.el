@@ -708,8 +708,9 @@ If TOP-P is non-nil, make the current line the top line."
 BUFFER-NAME is the name of the new target buffer."
   (interactive (list (cond (current-prefix-arg (find-file-noselect (inspirehep-select-bib-file)))
                            (t (read-buffer "Buffer to insert entries into: " nil t
-                                           (lambda (b) (eq 'bibtex-mode (buffer-local-value 'major-mode (get-buffer (if (stringp b) b (car b)))))))))))
-  (let ((buffer (get-buffer buffer-name)))
+                                           (lambda (b) (memq (buffer-local-value 'major-mode (get-buffer (if (stringp b) b (car b))))
+                                                        '(bibtex-mode latex-mode LateX-mode))))))))
+  (let ((buffer (get-buffer (with-current-buffer buffer-name (funcall inspirehep-target-buffer-function)))))
     (if (buffer-local-value 'buffer-read-only buffer)
         (user-error "%s is read-only" (buffer-name buffer))
       (setq inspirehep--target-buffer buffer)
