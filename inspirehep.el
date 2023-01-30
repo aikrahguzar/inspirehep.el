@@ -635,7 +635,12 @@ If ALL-P is non-nil insert all results otherwise only the first page."
        (inspirehep--lookup-url (concat "https://inspirehep.net/api/literature/" recid) 'single-record (concat "recid:" recid)))
 
 ;;;;;; Bibtex and PDF
-(defun inspirehep-insert-bibtex (key) "Insert the bibtex corresponding to KEY in the target buffer unless SAVED ."
+(defun inspirehep-copy-bibtex (key) "Copy the bibtex corresponding to KEY in the target buffer."
+       (interactive (list (inspirehep-lookup-at-point 'identifier)))
+       (when-let ((bib (map-elt inspirehep-bibtex-entries key)))
+         (kill-new bib)))
+
+(defun inspirehep-insert-bibtex (key) "Insert the bibtex corresponding to KEY in the target buffer."
        (interactive (list (inspirehep-lookup-at-point 'identifier)))
        (when-let ((bib (map-elt inspirehep-bibtex-entries key))
                   (target (or inspirehep--target-buffer (call-interactively #'inspirehep-select-target-buffer)))
