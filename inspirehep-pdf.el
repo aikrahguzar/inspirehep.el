@@ -22,14 +22,15 @@
 ;;;; Variables
 (defvar inspirehep-pdf-manipulate-record-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "i") #'inspirehep-pdf-insert-bibtex)
-    (define-key map (kbd "d") #'inspirehep-pdf-download-pdf)
-    (define-key map (kbd "s") #'inspirehep-insert-and-download)
-    (define-key map (kbd "f") #'inspirehep-pdf-search)
     (define-key map (kbd "a") #'inspirehep-pdf-search-author)
-    (define-key map (kbd "c") #'inspirehep-pdf-search-citations)
-    (define-key map (kbd "v") #'inspirehep-pdf-view-entry)
     (define-key map (kbd "b") #'inspirehep-pdf-select-target-buffer)
+    (define-key map (kbd "c") #'inspirehep-pdf-search-citations)
+    (define-key map (kbd "d") #'inspirehep-pdf-download-pdf)
+    (define-key map (kbd "f") #'inspirehep-pdf-search)
+    (define-key map (kbd "i") #'inspirehep-pdf-insert-bibtex)
+    (define-key map (kbd "s") #'inspirehep-insert-and-download)
+    (define-key map (kbd "u") #'inspirehep-pdf-copy-arxiv-url)
+    (define-key map (kbd "v") #'inspirehep-pdf-view-entry)
     map)
   "A keymap for commands that act on the inspirehep record from a pdf buffer.")
 
@@ -94,11 +95,21 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
          (inspirehep-lookup (concat (pcase char (?a "a \"") (?d "doi:") (?t "t \"") (?x "arxiv:") (_ "")) str "\"")))
        (pdf-view-deactivate-region))
 
+(defun inspirehep-arxiv-id () "Get the arxiv id from the first page of an arxiv paper."
+       (when-let ((str (map-elt (car (pdf-info-search-string "arXiv" 1)) 'text))
+                  (beg (+ 6 (string-match "arXiv" str))))
+           (substring-no-properties str beg (string-match "v" str beg))))
+
+;;;###autoload
+(defun inspirehep-pdf-copy-arxiv-url () "Copy arxiv url using the id on first page or inspire record." (interactive)
+       (if-let (id (inspirehep-arxiv-id))
+           (kill-new (concat "https://arxiv.org/abs/" id))
+         (or (companion-mode-with-companion (save-excursion (goto-char (point-min)) (inspirehep-copy-arxiv-url)))
+             (message "No arxiv url found for this pdf."))))
+
 ;;;###autoload
 (defun inspirehep-pdf-get-record () "Get the inspire record using the arxiv id on the first page." (interactive)
-       (if-let ((str (map-elt (car (pdf-info-search-string "arXiv" 1)) 'text))
-                (beg (+ 6 (string-match "arXiv" str)))
-                (id (substring-no-properties str beg (string-match "v" str beg)))
+       (if-let ((id (inspirehep-arxiv-id))
                 (url (concat "https://inspirehep.net/api/arxiv/" id))
                 (buf (get-buffer-create (concat "* INSPIREHEP PDF *" (buffer-name)))))
            (progn (with-current-buffer buf (inspirehep-mode)) (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) buf) buf)
@@ -144,7 +155,7 @@ The call is interactive if IS-INTERACTIVE is non-nill."
 (defun inspirehep-pdf-view-entry () "View detailed record for the selected entry." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-view-entry))
 
-;;;;Misc
+;;;; Misc
 (defun inspirehep-pdf-toggle-details () "Toggle details for the selected entry." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-toggle-details))
 

@@ -360,7 +360,7 @@ This is meant to show a single literature record and erases the buffer."
 
 ;;;;;; Results buffer construction
 (defun inspirehep--make-results-buffer (&optional name)
-  "Make a new inspirehep-mode buffer.
+  "Make a new `inspirehep-mode' buffer.
 The buffer name is based on NAME if it is non-nill, otheriwse * INSPIRE HEP *."
   (let ((target-buffer (funcall inspirehep-target-buffer-function)))
     (with-current-buffer (generate-new-buffer (or name "* INSPIRE HEP *"))
@@ -730,6 +730,14 @@ When ALL-P is non-nill kill all `inspirehep-mode' buffers."
                (eq (buffer-local-value 'major-mode buf) 'inspirehep-mode)
                (or all-p (string-match-p "* INSPIRE HEP *" (buffer-name buf))))
       (kill-buffer buf))))
+
+(defun inspirehep-copy-arxiv-url (&optional msg)
+  "Copy the arxiv url for the current entry.
+If MSG is non nil and no url is found a message is emitted."
+  (interactive (list t))
+  (if-let ((url (inspirehep-lookup-at-point 'arxiv-url)))
+      (kill-new (inspirehep-lookup-at-point 'arxiv-url))
+    (when msg (message "No arxiv url for the current-entry."))))
 
 (provide 'inspirehep)
 
