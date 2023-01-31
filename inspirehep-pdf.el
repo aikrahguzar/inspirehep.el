@@ -24,6 +24,7 @@
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "a") #'inspirehep-pdf-search-author)
     (define-key map (kbd "b") #'inspirehep-pdf-select-target-buffer)
+    (define-key map (kbd "B") #'inspirehep-pdf-copy-bibtex)
     (define-key map (kbd "c") #'inspirehep-pdf-search-citations)
     (define-key map (kbd "d") #'inspirehep-pdf-download-pdf)
     (define-key map (kbd "f") #'inspirehep-pdf-search)
@@ -133,6 +134,9 @@ The call is interactive if IS-INTERACTIVE is non-nill."
        (inspirehep-pdf--with-record-buffer nil #'inspirehep-hide-jump-show ref t))
 
 ;;;;;; Bibtex and download
+(defun inspirehep-pdf-copy-bibtex () "Insert bibtex for the currently selected entry into the target buffer." (interactive)
+       (inspirehep-pdf--with-record-buffer t #'inspirehep-copy-bibtex))
+
 (defun inspirehep-pdf-insert-bibtex () "Insert bibtex for the currently selected entry into the target buffer." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-insert-bibtex))
 
