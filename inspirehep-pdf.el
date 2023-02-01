@@ -32,6 +32,7 @@
     (define-key map (kbd "s") #'inspirehep-insert-and-download)
     (define-key map (kbd "u") #'inspirehep-pdf-copy-arxiv-url)
     (define-key map (kbd "v") #'inspirehep-pdf-view-entry)
+    (define-key map (kbd "w") #'inspirehep-pdf-save)
     map)
   "A keymap for commands that act on the inspirehep record from a pdf buffer.")
 
@@ -112,7 +113,7 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
 (defun inspirehep-pdf-get-record () "Get the inspire record using the arxiv id on the first page." (interactive)
        (if-let ((id (inspirehep-arxiv-id))
                 (url (concat "https://inspirehep.net/api/arxiv/" id))
-                (buf (get-buffer-create (concat "* INSPIREHEP PDF *" (buffer-name)))))
+                (buf (get-buffer-create (concat "* INSPIREHEP PDF *" id))))
            (progn (with-current-buffer buf (inspirehep-mode)) (inspirehep--lookup-url url 'single-record (concat "arxiv:" id) buf) buf)
          (message "No arxiv id found for the current PDF.") nil))
 
@@ -162,6 +163,11 @@ The call is interactive if IS-INTERACTIVE is non-nill."
 ;;;; Misc
 (defun inspirehep-pdf-toggle-details () "Toggle details for the selected entry." (interactive)
        (inspirehep-pdf--with-record-buffer t #'inspirehep-toggle-details))
+
+(defun inspirehep-pdf-save () "Save the current file." (interactive)
+       (let ((name (companion-mode-with-companion
+                    (save-excursion (goto-char (point-min)) (inspirehep-lookup-at-point 'filename)))))
+         (write-file (expand-file-name name inspirehep-download-directory))))
 
 (provide 'inspirehep-pdf)
 ;;; inspirehep-pdf.el ends here
