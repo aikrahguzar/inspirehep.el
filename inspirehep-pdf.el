@@ -122,47 +122,42 @@ This functions can be used as a replacement for `pdf-links-browse-uri-function'"
        (companion-mode-set #'inspirehep-pdf-get-record nil t))
 
 ;;;; Acting on the buffer showing the record
-(defun inspirehep-pdf--with-record-buffer (is-interactive func &rest args)
-  "Call FUNC with ARGS on the buffer showing inspire record.
-The call is interactive if IS-INTERACTIVE is non-nill."
-  (companion-mode-with-companion (if is-interactive (call-interactively func) (apply func args))))
-
 (defun inspirehep-pdf-jump-to-reference (ref) "Jump to reference REF in the record buffer."
        (interactive (list (pcase current-prefix-arg
                             (0 (string-join (pdf-view-active-region-text)))
                             ((pred numberp) (number-to-string current-prefix-arg))
                             (_ (inspirehep-pdf--select-ref (inspirehep-pdf--refs-on-page (pdf-view-current-page)))))))
-       (inspirehep-pdf--with-record-buffer nil #'inspirehep-hide-jump-show ref t))
+       (companion-mode-with-companion nil #'inspirehep-hide-jump-show ref t))
 
 ;;;;;; Bibtex and download
 (defun inspirehep-pdf-copy-bibtex () "Insert bibtex for the currently selected entry into the target buffer." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-copy-bibtex))
+       (companion-mode-with-companion (call-interactively #'inspirehep-copy-bibtex)))
 
 (defun inspirehep-pdf-insert-bibtex () "Insert bibtex for the currently selected entry into the target buffer." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-insert-bibtex))
+       (companion-mode-with-companion (call-interactively #'inspirehep-insert-bibtex)))
 
 (defun inspirehep-pdf-download-pdf () "Download the pdf for the currently selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-download-pdf))
+       (companion-mode-with-companion (call-interactively #'inspirehep-download-pdf)))
 
 (defun inspirehep-pdf-insert-and-download () "Download the pdf and insert bibtex for the currently selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-insert-and-download))
+       (companion-mode-with-companion (call-interactively #'inspirehep-insert-and-download)))
 
 (defun inspirehep-pdf-select-target-buffer () "Select the buffer to insert bibtex entries in." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-select-target-buffer))
+       (companion-mode-with-companion (call-interactively #'inspirehep-select-target-buffer)))
 
 ;;;;;; Search
 (defun inspirehep-pdf-search-author () "Search an author of the selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-search-author))
+       (companion-mode-with-companion (call-interactively #'inspirehep-search-author)))
 
 (defun inspirehep-pdf-search-citations () "Search for literature citing the selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-search-citations))
+       (companion-mode-with-companion (call-interactively #'inspirehep-search-citations)))
 
 (defun inspirehep-pdf-view-entry () "View detailed record for the selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-view-entry))
+       (companion-mode-with-companion (call-interactively #'inspirehep-view-entry)))
 
 ;;;; Misc
 (defun inspirehep-pdf-toggle-details () "Toggle details for the selected entry." (interactive)
-       (inspirehep-pdf--with-record-buffer t #'inspirehep-toggle-details))
+       (companion-mode-with-companion (call-interactively #'inspirehep-toggle-details)))
 
 (defun inspirehep-pdf-save () "Save the current file." (interactive)
        (let ((name (companion-mode-with-companion
