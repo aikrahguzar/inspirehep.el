@@ -1,4 +1,4 @@
-#Moved to: https://codeberg.org/rahguzar/inspirehep.el
+# Moved to: https://codeberg.org/rahguzar/inspirehep.el
 
 # inspirehep.el: An Emacs package for High Enegry Physics literature search
 [![GPL 3](https://img.shields.io/badge/license-GPLv3-blue.svg)](COPYING)
